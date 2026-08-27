@@ -62,6 +62,9 @@
   .btn:active{transform:translateY(0)}
   .btn svg{width:21px;height:21px;flex:none}
   .meta{color:var(--muted); font-size:13.5px; margin:15px 0 0}
+  .other{margin:11px 0 0; font-size:13.5px}
+  .other a{color:var(--muted); text-decoration:underline; text-underline-offset:3px}
+  .other a:hover{color:var(--accent)}
 
   .card{
     background:var(--surface); border:1px solid var(--line);
@@ -116,14 +119,15 @@
   </header>
 
   <div class="cta">
-    <a class="btn" href="https://hzdzbxhqezqszjputpzo.supabase.co/storage/v1/object/public/web/pc/etalk-setup.exe?download=%EC%95%A0%ED%86%A1_%EC%84%A4%EC%B9%98.exe">
+    <a class="btn" id="main" href="https://hzdzbxhqezqszjputpzo.supabase.co/storage/v1/object/public/web/pc/etalk-setup.exe?download=%EC%95%A0%ED%86%A1_%EC%84%A4%EC%B9%98.exe">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 21h16"/>
       </svg>
-      Windows 용 내려받기
+      <span id="mainLabel">Windows 용 내려받기</span>
     </a>
-    <p class="meta">Windows 10 이상 · 64비트 · 41MB</p>
+    <p class="meta" id="mainMeta">Windows 10 이상 · 64비트 · 42MB</p>
+    <p class="other"><a id="alt" href="https://hzdzbxhqezqszjputpzo.supabase.co/storage/v1/object/public/web/pc/etalk-mac.dmg?download=%EC%95%A0%ED%86%A1.dmg">맥은 여기서 내려받기</a></p>
   </div>
 
   <div class="card">
@@ -148,12 +152,12 @@
     </ol>
   </div>
 
-  <div class="note">
+  <div class="note" id="note">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="9"/><path d="M12 8h.01"/><path d="M11 12h1v4h1"/>
     </svg>
-    <div>
+    <div id="noteBody">
       실행할 때 윈도우가 <b>「PC 를 보호했습니다」</b> 라고 막을 수 있어요.
       아직 서명 인증서를 붙이지 않아서 그렇습니다.
       <b>추가 정보 → 실행</b> 을 누르면 열립니다.
@@ -165,5 +169,26 @@
   </footer>
 
 </div>
+<script>
+  // **쓰는 기기 것을 크게 보여 준다.** 맥으로 들어온 사람에게 큰 단추가
+  // 「Windows 용」이면, 맥판이 없는 줄 알고 그냥 나간다.
+  (function () {
+    var mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+    if (!mac) return;
+    var WIN = "https://hzdzbxhqezqszjputpzo.supabase.co/storage/v1/object/public/web/pc/etalk-setup.exe?download=%EC%95%A0%ED%86%A1_%EC%84%A4%EC%B9%98.exe";
+    var MAC = "https://hzdzbxhqezqszjputpzo.supabase.co/storage/v1/object/public/web/pc/etalk-mac.dmg?download=%EC%95%A0%ED%86%A1.dmg";
+    document.getElementById("main").href = MAC;
+    document.getElementById("mainLabel").textContent = "Mac 용 내려받기";
+    document.getElementById("mainMeta").textContent =
+      "macOS 11 이상 · Apple 실리콘 · 68MB";
+    var alt = document.getElementById("alt");
+    alt.href = WIN;
+    alt.textContent = "윈도우는 여기서 내려받기";
+    document.getElementById("noteBody").innerHTML =
+      '\uc5f4 \ub54c \ub9e5\uc774 <b>\u300c\ud655\uc778\ub418\uc9c0 \uc54a\uc740 \uac1c\ubc1c\uc790\u300d</b>\ub77c\uace0 \ub9c9\uc744 \uc218 \uc788\uc5b4\uc694. ' +
+      '\uc544\uc9c1 \uc11c\uba85\uc744 \ubd99\uc774\uc9c0 \uc54a\uc544\uc11c \uadf8\ub7fd\uc2b5\ub2c8\ub2e4. ' +
+      '\uc560\ud1a1\uc744 <b>\uc624\ub978\ucabd\uc73c\ub85c \ub204\ub974\uace0 \u300c\uc5f4\uae30\u300d</b>\ub97c \uace0\ub974\uba74 \uc5f4\ub9bd\ub2c8\ub2e4. \uccab \ubc88\ub9cc \ud558\uba74 \ub3fc\uc694.';
+  })();
+</script>
 </body>
 </html>
