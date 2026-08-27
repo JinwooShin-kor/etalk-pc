@@ -133,7 +133,7 @@
   <div class="card">
     <h2>설치하고 여는 법</h2>
     <ol>
-      <li>
+      <li id="step1">
         <b>내려받은 파일을 실행하세요</b>
         <span>관리자 권한은 묻지 않아요. 바탕화면에 바로가기가 생깁니다.</span>
       </li>
@@ -170,24 +170,38 @@
 
 </div>
 <script>
-  // **쓰는 기기 것을 크게 보여 준다.** 맥으로 들어온 사람에게 큰 단추가
-  // 「Windows 용」이면, 맥판이 없는 줄 알고 그냥 나간다.
+  // **쓰는 기기 것을 큰 단추로.**
+  //
+  // 맥으로 들어온 사람에게 큰 단추가 「Windows 용」이면, 맥판이 없는 줄
+  // 알고 그냥 나간다. 다른 쪽은 아래 한 줄로 남긴다.
   (function () {
-    var mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+    var ua = navigator.userAgent || "";
+    var mac = /Mac/.test(navigator.platform || "") || /Macintosh/.test(ua);
     if (!mac) return;
-    var WIN = "https://hzdzbxhqezqszjputpzo.supabase.co/storage/v1/object/public/web/pc/etalk-setup.exe?download=%EC%95%A0%ED%86%A1_%EC%84%A4%EC%B9%98.exe";
-    var MAC = "https://hzdzbxhqezqszjputpzo.supabase.co/storage/v1/object/public/web/pc/etalk-mac.dmg?download=%EC%95%A0%ED%86%A1.dmg";
-    document.getElementById("main").href = MAC;
+
+    var main = document.getElementById("main");
+    main.href = "https://hzdzbxhqezqszjputpzo.supabase.co/storage/v1/object/public/web/pc/etalk-mac.dmg?download=%EC%95%A0%ED%86%A1.dmg";
     document.getElementById("mainLabel").textContent = "Mac 용 내려받기";
     document.getElementById("mainMeta").textContent =
-      "macOS 11 이상 · Apple 실리콘 · 68MB";
+      "macOS 11 이상 · 68MB";
+
     var alt = document.getElementById("alt");
-    alt.href = WIN;
+    alt.href = "https://hzdzbxhqezqszjputpzo.supabase.co/storage/v1/object/public/web/pc/etalk-setup.exe?download=%EC%95%A0%ED%86%A1_%EC%84%A4%EC%B9%98.exe";
     alt.textContent = "윈도우는 여기서 내려받기";
+
+    // 첫 걸음이 다르다 — 윈도우는 실행, 맥은 끌어다 넣기.
+    var step = document.getElementById("step1");
+    if (step) {
+      step.querySelector("b").textContent = "애톡을 응용 프로그램으로 끌어다 놓으세요";
+      step.querySelector("span").textContent =
+        "내려받은 파일을 열면 창이 하나 뜹니다. 거기서 끌어다 놓으면 설치돼요.";
+    }
+
+    // 막히는 방식도 다르다.
     document.getElementById("noteBody").innerHTML =
-      '\uc5f4 \ub54c \ub9e5\uc774 <b>\u300c\ud655\uc778\ub418\uc9c0 \uc54a\uc740 \uac1c\ubc1c\uc790\u300d</b>\ub77c\uace0 \ub9c9\uc744 \uc218 \uc788\uc5b4\uc694. ' +
-      '\uc544\uc9c1 \uc11c\uba85\uc744 \ubd99\uc774\uc9c0 \uc54a\uc544\uc11c \uadf8\ub7fd\uc2b5\ub2c8\ub2e4. ' +
-      '\uc560\ud1a1\uc744 <b>\uc624\ub978\ucabd\uc73c\ub85c \ub204\ub974\uace0 \u300c\uc5f4\uae30\u300d</b>\ub97c \uace0\ub974\uba74 \uc5f4\ub9bd\ub2c8\ub2e4. \uccab \ubc88\ub9cc \ud558\uba74 \ub3fc\uc694.';
+      "열 때 맥이 <b>「확인되지 않은 개발자」</b>라고 막을 수 있어요. " +
+      "아직 서명을 붙이지 않아서 그렇습니다. " +
+      "애톡을 <b>오른쪽으로 누르고 「열기」</b>를 고르면 열립니다. 한 번만 하면 돼요.";
   })();
 </script>
 </body>
