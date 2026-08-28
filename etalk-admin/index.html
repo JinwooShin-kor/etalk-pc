@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<title>애톡 운영 콘솔</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>💗</text></svg>">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+
+<!-- ── 관문 ────────────────────────────────────────────── -->
+<div id="gate">
+  <form class="card" id="loginForm" autocomplete="on">
+    <h1>애톡 운영 콘솔</h1>
+    <p class="sub">운영자만 들어옵니다.</p>
+    <label for="email">이메일</label>
+    <input id="email" type="email" autocomplete="username" required>
+    <label for="pw">비밀번호</label>
+    <input id="pw" type="password" autocomplete="current-password" required>
+    <button class="btn wide" id="loginBtn" type="submit">들어가기</button>
+    <div class="err" id="loginErr"></div>
+  </form>
+</div>
+
+<!-- ── 본체 ────────────────────────────────────────────── -->
+<div id="app" hidden>
+  <header>
+    <div class="bar">
+      <div class="brand">애톡 <span>운영 콘솔</span></div>
+      <div class="live"><span class="dot on" id="liveDot"></span><span id="liveTxt">이어지는 중…</span></div>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="refreshBtn" type="button">새로 고침</button>
+      <button class="btn ghost" id="logoutBtn" type="button">나가기</button>
+    </div>
+    <nav id="tabs">
+      <button data-tab="sum" class="on">요약</button>
+      <button data-tab="people">사람</button>
+      <button data-tab="couples">커플</button>
+      <button data-tab="content">컨텐츠</button>
+      <button data-tab="support">문의<span class="badge" id="openBadge" hidden>0</span></button>
+      <button data-tab="config">설정</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- 요약 -->
+    <section id="sum" class="on">
+      <div class="grid g4" id="liveTiles"></div>
+
+      <div class="grid g2" style="margin-top:12px">
+        <div class="card">
+          <h2>사람 <span class="note">가입만 한 계정을 따로 센다</span></h2>
+          <div id="tiers"></div>
+        </div>
+        <div class="card">
+          <h2>가입에서 결제까지</h2>
+          <div class="funnel" id="funnel"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h2>추이 <span class="note" id="seriesNote"></span>
+          <span class="spacer"></span>
+          <select id="seriesDays" style="width:auto">
+            <option value="14">14일</option>
+            <option value="30" selected>30일</option>
+            <option value="60">60일</option>
+            <option value="90">90일</option>
+          </select>
+        </h2>
+        <div class="chartwrap" id="chart"></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h2>잔존율 <span class="note">가입한 주로 묶어, 그 뒤 주마다 몇 명이 다시 움직였나</span></h2>
+        <div id="retention"></div>
+      </div>
+
+      <div class="grid g2" style="margin-top:12px">
+        <div class="card"><h2>돈</h2><div id="money"></div></div>
+        <div class="card"><h2>비서(AI)</h2><div id="ai"></div></div>
+      </div>
+
+      <div class="grid g2" style="margin-top:12px">
+        <div class="card"><h2>지금 움직임 <span class="note">내용은 담지 않는다</span></h2>
+          <div class="feed" id="feed"></div></div>
+        <div class="card"><h2>시스템</h2><div id="system"></div></div>
+      </div>
+    </section>
+
+    <!-- 사람 -->
+    <section id="people">
+      <div class="card">
+        <h2>사람</h2>
+        <div class="row2" style="margin-bottom:10px">
+          <select id="tierSel" style="width:auto">
+            <option value="">전체</option>
+            <option value="active">활동</option>
+            <option value="paired">연결만</option>
+            <option value="visited">둘러봄</option>
+            <option value="signup">가입만</option>
+          </select>
+          <input id="userQ" placeholder="이름 · 이메일 검색" style="max-width:260px">
+          <span class="muted small" id="userCount"></span>
+        </div>
+        <div class="split">
+          <div class="tblwrap" style="max-height:70vh;overflow-y:auto">
+            <table id="userTbl"></table>
+          </div>
+          <div class="card" id="userDetail" style="background:var(--panel2)">
+            <span class="muted small">왼쪽에서 사람을 고르면 자세히 보여 줍니다.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 커플 -->
+    <section id="couples">
+      <div class="card">
+        <h2>커플 <span class="note" id="coupleNote"></span></h2>
+        <div class="row2" style="margin-bottom:10px">
+          <select id="coupleGrp" style="width:auto"></select>
+          <label class="muted small"><input type="checkbox" id="hideEmpty" style="width:auto"> 아무것도 안 한 커플 숨기기</label>
+          <label class="muted small"><input type="checkbox" id="showAllCols" style="width:auto"> 아무도 안 쓴 컨텐츠 열도 보기</label>
+        </div>
+        <div class="tblwrap"><table id="coupleTbl"></table></div>
+      </div>
+    </section>
+
+    <!-- 컨텐츠 -->
+    <section id="content">
+      <div class="card">
+        <h2>컨텐츠 사용량 <span class="note">집계 원천은 ae_ops_sources 표에 있다</span></h2>
+        <div class="tblwrap"><table id="contentTbl"></table></div>
+      </div>
+    </section>
+
+    <!-- 문의 -->
+    <section id="support">
+      <div class="split">
+        <div class="card" style="padding:0">
+          <div class="list" id="ticketList"></div>
+        </div>
+        <div class="card" id="ticketPane">
+          <span class="muted small">왼쪽에서 문의를 고르세요.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 설정 -->
+    <section id="config">
+      <div class="card">
+        <h2>원격 설정 <span class="note">저장하면 앱에 바로 반영된다</span></h2>
+        <div id="configList"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="app.js?v=1"></script>
+</body>
+</html>

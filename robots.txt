@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /etalk-admin/
 
 Sitemap: https://etalk.kr/sitemap.xml
