@@ -108,7 +108,7 @@ function toast(msg) {
 const S = {
   tab: 'sum',
   overview: null, series: null, content: null, couples: null,
-  users: null, tickets: null, config: null, live: null, retention: null,
+  users: null, tickets: null, config: null, live: null, retention: null, audit: null,
   ticketId: null, userId: null,
   coupleSort: 'last_talk', coupleDesc: true,
   contentSort: 'total', contentDesc: true,
@@ -308,9 +308,14 @@ function renderAi() {
       토큰 수는 쌓이니 값은 나중에 소급해 계산할 수 있습니다.</div>` : ''}
     <div style="margin-top:8px">
       ${h.falling_back
-        ? `<span class="pill bad">지금 대체 모델로 돌고 있음</span>
-           <span class="small muted"> ${esc(h.wanted || '')} → ${esc(h.used || '')} · ${esc(h.why || '')}</span>`
-        : '<span class="pill good">제 모델로 돌고 있음</span>'}
+        ? `<span class="pill bad">지금 대체 모델로 돌고 있다</span>
+           <span class="small" style="color:var(--warn)">
+             ${esc(h.wanted || '본래 모델')} 대신 ${esc(h.used || '대체 모델')} 로 답하고 있습니다
+             ${h.why ? `(${esc(h.why)})` : ''} — 값이 몇 배로 뜁니다. 키부터 확인하세요.</span>`
+        : `<span class="pill good">본래 모델로 돌고 있다</span>
+           <span class="small muted">글은 OpenAI 가 씁니다.
+             키가 비면 앱이 깜깜해지지 않게 <b>대체 모델</b>로 조용히 넘어가는데(값은 몇 배),
+             지금은 넘어간 적이 없습니다${h.last_at ? ` · 마지막 대체 ${clock(h.last_at)}` : ''}.</span>`}
     </div>`;
 }
 
@@ -364,6 +369,53 @@ function renderRetention() {
       }).join('')}</tr>`).join('')}</tbody></table></div>
     <div class="small muted" style="margin-top:8px">${esc(d.note || '')} ·
       「그 주」가 인원보다 훨씬 작으면 <b>가입하고 아무것도 안 한 사람</b>이 그만큼이라는 뜻입니다.</div>`;
+}
+
+const ORIGIN = {
+  organic:  ['바깥 손님', 'good',  '우리가 만들지 않은 계정'],
+  internal: ['내부 시험', 'pink',  'etalk.dev · etalk.app · test* · 진우님 계정'],
+  bulk:     ['뭉텅이 가입', 'warn', '이름성.숫자@gmail 꼴 · 메시지도 기기도 없음'],
+};
+
+function renderAudit() {
+  const a = S.audit; if (!a) return;
+  const by = a.by_origin || {};
+  const order = ['organic', 'internal', 'bulk'];
+  const tot = Number(a.total || 0) || 1;
+  const risky = (a.bulk_but_active || []).length;
+
+  $('#audit').innerHTML = `
+    <div class="stack">${order.map((k) => {
+      const v = Number(by[k]?.n || 0); const w = (v / tot) * 100;
+      const c = { organic: 'var(--good)', internal: 'var(--pink)', bulk: 'var(--ink3)' }[k];
+      return w <= 0 ? '' : `<div style="width:${w}%;background:${c}">${w > 8 ? n(v) : ''}</div>`;
+    }).join('')}</div>
+    <div class="tblwrap" style="margin-top:12px"><table>
+      <thead><tr><th class="noSort">어디서 왔나</th><th class="noSort">계정</th>
+        <th class="noSort">커플</th><th class="noSort">대화함</th><th class="noSort">기기 등록</th>
+        <th class="noSort">30일 활동</th><th class="noSort">한 번 열고 끝</th></tr></thead>
+      <tbody>${order.map((k) => {
+        const v = by[k]; if (!v) return '';
+        const [l, c, note] = ORIGIN[k];
+        return `<tr>
+          <td><span class="pill ${c}">${l}</span>
+            <div class="muted small">${note}</div></td>
+          <td class="num">${n(v.n)}</td>
+          <td class="num ${Number(v.paired) ? '' : 'zero'}">${n(v.paired)}</td>
+          <td class="num ${Number(v.talked) ? '' : 'zero'}">${n(v.talked)}</td>
+          <td class="num ${Number(v.devices) ? '' : 'zero'}">${n(v.devices)}</td>
+          <td class="num ${Number(v.active) ? '' : 'zero'}">${n(v.active)}</td>
+          <td class="num muted">${n(v.one_shot)}</td></tr>`;
+      }).join('')}</tbody></table></div>
+    ${risky
+      ? `<div class="small" style="color:var(--warn);margin-top:8px">
+           뭉텅이로 분류됐는데 실제로 쓴 계정이 ${risky}개 있습니다 — 규칙이 사람을 잡아먹고 있습니다.
+           ${(a.bulk_but_active || []).map((x) => esc(x.name || x.email)).join(', ')}</div>`
+      : `<div class="small muted" style="margin-top:8px">
+           뭉텅이로 분류된 계정 중 실제로 쓴 것은 <b>하나도 없습니다</b> — 규칙이 사람을 잘못 지우고 있지 않습니다.
+           <br>잣대: 내부 <span class="mono">${esc(a.rules?.internal_email || '')}</span>
+           · 뭉텅이 <span class="mono">${esc(a.rules?.bulk_email || '')}</span>
+           (설정 탭의 <span class="mono">signup_audit</span> 에서 고칩니다)</div>`}`;
 }
 
 /* ══ 사람 ══════════════════════════════════════════════ */
@@ -676,20 +728,21 @@ async function loadUsers() {
 
 async function loadAll() {
   const days = Number($('#seriesDays').value || 30);
-  const [ov, se, co, cp, cf, rt] = await Promise.all([
+  const [ov, se, co, cp, cf, rt, au] = await Promise.all([
     rpc('ae_ops_overview'),
     rpc('ae_ops_series', { p_days: days }),
     rpc('ae_ops_content'),
     rpc('ae_ops_couples'),
     rpc('ae_ops_config'),
     rpc('ae_ops_retention', { p_weeks: 10 }),
+    rpc('ae_ops_signup_audit'),
   ]);
   S.overview = ov; S.series = se; S.content = co; S.couples = cp;
-  S.config = cf; S.retention = rt;
+  S.config = cf; S.retention = rt; S.audit = au;
   S.lastFull = Date.now();
   renderTiers(); renderFunnel(); renderSeries(); renderMoney(); renderAi();
   renderSystem(); renderContent(); renderCouples(); renderConfig();
-  renderRetention(); renderLive();
+  renderRetention(); renderAudit(); renderLive();
   await Promise.all([loadUsers(), loadTickets()]);
 }
 
