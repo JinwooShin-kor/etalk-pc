@@ -265,14 +265,21 @@ function renderBrief() {
     }
   }
 
-  // 5. 돈
-  const prod = Number(m.subs_live_prod || 0), sand = Number(m.subs_live_sandbox || 0);
-  if (prod === 0 && sand > 0) {
-    add('warn', `살아 있는 구독 <b>${n(sand)}건이 전부 샌드박스</b>입니다 — 실매출은 0원입니다.`,
-      '앱스토어 시험 결제라 돈이 들어오지 않습니다. 실결제가 생기면 여기가 초록으로 바뀝니다.');
-  } else if (prod > 0) {
-    add('good', `실제 구독이 <b>${n(prod)}건</b> 살아 있습니다.`,
-      `시험 결제 ${n(sand)}건은 따로 셉니다.`);
+  // 5. 돈 — **실매출만 매출이다.**
+  const R = m.revenue || {};
+  if (!R.has_any_real) {
+    const sandN = Number(R.hearts?.sandbox?.orders || 0)
+                + Number(R.subs?.sandbox_ever || 0)
+                + Number(R.reports?.sandbox || 0);
+    add('warn', '실제 매출이 <b>아직 0원</b>입니다.',
+      `지금까지의 결제 ${n(sandN)}건은 전부 스토어 시험 결제(샌드박스)라 돈이 들어오지 않았습니다. 첫 실결제가 생기면 여기가 초록으로 바뀝니다.`);
+  } else {
+    const won = Number(R.total_won || 0);
+    add('good', won > 0
+        ? `실매출 <b>${n(won)}원</b>이 들어왔습니다.`
+        : '<b>실제 결제</b>가 들어오기 시작했습니다.',
+      `하트 충전 ${n(R.hearts?.real?.orders)}건 · 구독 ${n(R.subs?.real_ever)}건 · 리포트 ${n(R.reports?.real)}건` +
+      (R.priced ? '' : ' · 하트 팩 가격이 설정에 없어 원으로 환산하지 못했습니다.'));
   }
 
   // 6. AI 건강
@@ -529,35 +536,76 @@ const REASON = {
 
 function renderMoney() {
   const m = S.overview?.money; if (!m) return;
-  const prices = m.heart_prices || {};
-  const hasPrice = Object.keys(prices).length > 0;
-  const subs = (m.subs || []).map((s) =>
-    `<span class="pill ${s.env === 'Production' ? 'good' : 'warn'}">${esc(s.env)} · ${esc(s.status)} ${n(s.n)}</span>`).join(' ');
-  const sandboxOnly = Number(m.subs_live_prod || 0) === 0 && Number(m.subs_live_sandbox || 0) > 0;
+  const R = m.revenue || {};
+  const H = R.hearts || {}, SB = R.subs || {}, RP = R.reports || {};
+  const won = Number(R.total_won || 0);
   const byReason = Object.fromEntries(Object.entries(m.spend_by_reason || {})
     .map(([k, v]) => [REASON[k] || k, v]));
 
+  const sandN = Number(H.sandbox?.orders || 0) + Number(SB.sandbox_ever || 0)
+              + Number(RP.sandbox || 0);
+  const unk = Number(H.unknown?.orders || 0);
+
   $('#money').innerHTML = `
-    <div class="grid g4" style="margin-bottom:12px">
-      <div class="tile"><div class="k">충전된 하트</div><div class="v">${n(m.hearts_bought)}</div>
-        <div class="d">${n(m.heart_orders)}건 · 30일 ${n(m.heart_orders_30d)}건</div></div>
-      <div class="tile"><div class="k">쓴 하트</div><div class="v">${n(m.hearts_spent)}</div>
-        <div class="d">커플끼리 주고받은 건 뺐습니다</div></div>
-      <div class="tile"><div class="k">남은 하트</div><div class="v">${n(m.hearts_held)}</div>
-        <div class="d">모든 커플 지갑을 합한 값</div></div>
-      <div class="tile"><div class="k">리포트 판매</div><div class="v">${n(m.reports_sold)}</div>
-        <div class="d">인앱결제 + 하트 결제</div></div>
+    <!-- 실매출. **이 카드에서 가장 큰 숫자여야 한다.** -->
+    <div class="card" style="background:var(--panel2);border-color:${R.has_any_real ? 'var(--good)' : 'var(--line)'}">
+      <div class="k muted small">실매출 <span class="pill ${R.has_any_real ? 'good' : ''}">
+        ${R.has_any_real ? '실제 결제' : '아직 없음'}</span></div>
+      <div class="v" style="font-size:34px;margin-top:4px">
+        ${R.priced || won > 0 ? `${n(won)}원` : (R.has_any_real ? '가격 미설정' : '0원')}</div>
+      <div class="small muted" style="margin-top:4px">
+        스토어 시험 결제(샌드박스)는 <b>빼고</b> 센 값입니다. 여기 잡히는 것만 진짜 돈입니다.
+      </div>
+      <div class="grid g4" style="margin-top:12px">
+        <div class="tile"><div class="k">하트 충전</div>
+          <div class="v" style="font-size:20px">${n(H.real?.orders)}건</div>
+          <div class="d">${n(H.real?.hearts)}하트 · 30일 ${n(H.real?.orders_30d)}건</div></div>
+        <div class="tile"><div class="k">구독(프로)</div>
+          <div class="v" style="font-size:20px">${n(SB.real_ever)}건</div>
+          <div class="d">지금 살아 있는 것 ${n(SB.real_live)}건</div></div>
+        <div class="tile"><div class="k">리포트</div>
+          <div class="v" style="font-size:20px">${n(RP.real)}건</div>
+          <div class="d">인앱결제로 산 것만</div></div>
+      </div>
+      ${R.has_any_real && !R.priced ? `<div class="small" style="color:var(--warn);margin-top:8px">
+        실결제가 들어왔는데 <span class="mono">heart_prices</span> 가 비어 있어 원으로 환산하지 못했습니다.
+        설정 탭에서 상품별 가격을 넣어 주세요.</div>` : ''}
+      ${Number(H.real?.unpriced || 0) > 0 ? `<div class="small" style="color:var(--warn);margin-top:6px">
+        실결제 ${n(H.real.unpriced)}건은 값을 모르는 팩이라 매출에 못 넣었습니다.</div>` : ''}
     </div>
-    <div class="row2" style="margin-bottom:8px">
-      <span class="muted small">구독</span>${subs || '<span class="muted small">없음</span>'}
+
+    <!-- 시험 결제. 지우지 않고 옆에 둔다 — 「왜 0원이냐」의 답이 여기 있다. -->
+    <div style="margin-top:12px">
+      <div class="muted small" style="margin-bottom:6px">시험 결제 (샌드박스 · 돈 아님)</div>
+      <div class="row2">
+        <span class="pill warn">하트 ${n(H.sandbox?.orders)}건 · ${n(H.sandbox?.hearts)}하트</span>
+        <span class="pill warn">구독 ${n(SB.sandbox_ever)}건 (살아 있는 것 ${n(SB.sandbox_live)})</span>
+        <span class="pill warn">리포트 ${n(RP.sandbox)}건</span>
+      </div>
+      ${unk > 0 ? `<div class="small" style="color:var(--warn);margin-top:6px">
+        환경을 모르는 충전이 ${n(unk)}건 있습니다 — 2026-08-29 이전 기록이거나 영수증에 환경이 없던 건입니다.
+        매출에는 넣지 않았습니다.</div>` : ''}
+      <div class="small muted" style="margin-top:6px">
+        ${sandN > 0 && !R.has_any_real
+          ? '지금까지의 결제가 전부 여기 있습니다. 그래서 실매출이 0원입니다.'
+          : '스토어 심사와 시험 계정의 결제입니다.'}
+      </div>
     </div>
-    ${sandboxOnly ? `<div class="small" style="color:var(--warn)">
-      살아 있는 구독이 전부 <b>샌드박스</b>(앱스토어 시험 결제)입니다 — 실제 매출은 아직 0원입니다.</div>` : ''}
-    ${hasPrice ? '' : `<div class="small muted" style="margin-top:6px">
-      하트 팩 가격이 설정에 없어서 원 단위로 환산하지 않았습니다.
-      설정 탭의 <span class="mono">heart_prices</span> 에 상품별 가격을 넣으면 매출로 보여 줍니다.</div>`}
-    <div style="margin-top:12px"><div class="muted small" style="margin-bottom:4px">하트를 무엇에 썼나</div>
-      ${kv(byReason)}</div>`;
+
+    <!-- 앱 안 하트 경제. 돈이 아니다. -->
+    <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+      <div class="muted small" style="margin-bottom:6px">앱 안 하트 살림 <span class="muted">(돈이 아니라 앱 안 재화입니다)</span></div>
+      <div class="grid g4">
+        <div class="tile"><div class="k">쓴 하트</div><div class="v" style="font-size:20px">${n(m.hearts_spent)}</div>
+          <div class="d">커플끼리 주고받은 건 뺐습니다</div></div>
+        <div class="tile"><div class="k">남은 하트</div><div class="v" style="font-size:20px">${n(m.hearts_held)}</div>
+          <div class="d">모든 지갑을 합한 값</div></div>
+        <div class="tile"><div class="k">하트로 연 리포트</div><div class="v" style="font-size:20px">${n(RP.by_heart)}</div>
+          <div class="d">충전에서 이미 세었으므로 매출에 또 넣지 않습니다</div></div>
+      </div>
+      <div style="margin-top:12px"><div class="muted small" style="margin-bottom:4px">하트를 무엇에 썼나</div>
+        ${kv(byReason)}</div>
+    </div>`;
 }
 
 function renderAi() {
@@ -919,7 +967,7 @@ const CFG_DOC = {
     who: '앱',
     danger: '게시자 본인이 실광고를 누르면 무효 트래픽으로 계정이 정지될 수 있습니다. 진우님과 가까운 분의 id 는 여기 꼭 넣어 두세요.',
   },
-  heart_prices: { what: '하트 팩 상품별 원 가격. 넣으면 「돈」 카드가 매출을 원으로 환산합니다. 앱은 안 읽습니다.', who: '이 콘솔' },
+  heart_prices: { what: '하트 팩 상품별 원 가격 — <span class="mono">{"com.etalk.etalk.hearts.30": 1200, …}</span> 꼴. 넣으면 실매출을 원으로 환산합니다. 스토어가 가격을 쥐고 있어 DB 에는 없으므로, 여기 넣기 전까지는 건수만 셉니다. 앱은 안 읽습니다.', who: '이 콘솔' },
   signup_audit: { what: '가입 계정을 내부 시험 / 뭉텅이 / 바깥 손님으로 가르는 정규식. 앱은 안 읽습니다.', who: '이 콘솔' },
 };
 
