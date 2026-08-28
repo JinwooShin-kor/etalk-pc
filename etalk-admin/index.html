@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <title>애톡 운영 콘솔</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>💗</text></svg>">
-<link rel="stylesheet" href="style.css?v=1">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -30,39 +30,59 @@
   <header>
     <div class="bar">
       <div class="brand">애톡 <span>운영 콘솔</span></div>
-      <div class="live"><span class="dot on" id="liveDot"></span><span id="liveTxt">이어지는 중…</span></div>
+      <button class="live" id="liveChip" type="button" title="눌러서 자세히">
+        <span class="dot" id="liveDot"></span><span id="liveTxt">잇는 중…</span>
+      </button>
       <div class="spacer"></div>
-      <button class="btn ghost" id="refreshBtn" type="button">새로 고침</button>
+      <button class="btn ghost" id="refreshBtn" type="button">전부 다시 읽기</button>
       <button class="btn ghost" id="logoutBtn" type="button">나가기</button>
     </div>
+    <div id="liveDetail" class="livedetail" hidden></div>
     <nav id="tabs">
-      <button data-tab="sum" class="on">요약</button>
-      <button data-tab="people">사람</button>
+      <button data-tab="sum" class="on">오늘</button>
+      <button data-tab="people">사용자</button>
       <button data-tab="couples">커플</button>
-      <button data-tab="content">컨텐츠</button>
+      <button data-tab="content">기능 사용량</button>
       <button data-tab="support">문의<span class="badge" id="openBadge" hidden>0</span></button>
       <button data-tab="config">설정</button>
     </nav>
   </header>
 
   <main>
-    <!-- 요약 -->
+    <!-- ══ 오늘 ══ -->
     <section id="sum" class="on">
-      <div class="grid g4" id="liveTiles"></div>
+      <div class="card brief"><div id="brief"></div></div>
+
+      <div class="grid g4" id="liveTiles" style="margin-top:12px"></div>
 
       <div class="grid g2" style="margin-top:12px">
         <div class="card">
-          <h2>사람 <span class="note">가입만 한 계정을 따로 센다</span></h2>
+          <h2>사용자는 몇 명인가
+            <span class="note">한 가지 답은 늘 틀리다 — 단계로 나눠 센다</span></h2>
           <div id="tiers"></div>
         </div>
         <div class="card">
-          <h2>가입에서 결제까지</h2>
+          <h2>가입에서 결제까지
+            <span class="note">어디서 확 꺾이는지를 본다</span></h2>
           <div class="funnel" id="funnel"></div>
         </div>
       </div>
 
       <div class="card" style="margin-top:12px">
-        <h2>추이 <span class="note" id="seriesNote"></span>
+        <h2>가입이 어디서 왔나
+          <span class="note">사람으로 셀 수 있는 계정과 아닌 것</span></h2>
+        <div id="audit"></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h2>들어온 사람이 남는가 · 잔존율
+          <span class="note">가입한 주로 묶어, 그 뒤 주마다 몇 명이 다시 움직였나</span></h2>
+        <div id="retention"></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h2>날짜별 추이
+          <span class="note" id="seriesNote"></span>
           <span class="spacer"></span>
           <select id="seriesDays" style="width:auto">
             <option value="14">14일</option>
@@ -74,77 +94,71 @@
         <div class="chartwrap" id="chart"></div>
       </div>
 
-      <div class="card" style="margin-top:12px">
-        <h2>가입이 어디서 왔나 <span class="note">사람으로 셀 수 있는 계정과 아닌 것</span></h2>
-        <div id="audit"></div>
-      </div>
-
-      <div class="card" style="margin-top:12px">
-        <h2>잔존율 <span class="note">가입한 주로 묶어, 그 뒤 주마다 몇 명이 다시 움직였나</span></h2>
-        <div id="retention"></div>
+      <div class="grid g2" style="margin-top:12px">
+        <div class="card"><h2>돈 <span class="note">하트와 구독</span></h2><div id="money"></div></div>
+        <div class="card"><h2>비서(AI) <span class="note">얼마나 쓰고 얼마나 드나</span></h2><div id="ai"></div></div>
       </div>
 
       <div class="grid g2" style="margin-top:12px">
-        <div class="card"><h2>돈</h2><div id="money"></div></div>
-        <div class="card"><h2>비서(AI)</h2><div id="ai"></div></div>
-      </div>
-
-      <div class="grid g2" style="margin-top:12px">
-        <div class="card"><h2>지금 움직임 <span class="note">내용은 담지 않는다</span></h2>
+        <div class="card"><h2>지금 움직임
+          <span class="note">누가 무엇을 했는지만 · 내용은 담지 않는다</span></h2>
           <div class="feed" id="feed"></div></div>
-        <div class="card"><h2>시스템</h2><div id="system"></div></div>
+        <div class="card"><h2>시스템 <span class="note">막힌 곳이 있나</span></h2><div id="system"></div></div>
       </div>
     </section>
 
-    <!-- 사람 -->
+    <!-- ══ 사용자 ══ -->
     <section id="people">
+      <p class="lead">계정 하나하나입니다. 줄을 누르면 그 사람이 무엇을 했는지 오른쪽에 펼쳐집니다.</p>
       <div class="card">
-        <h2>사람</h2>
         <div class="row2" style="margin-bottom:10px">
           <select id="tierSel" style="width:auto">
-            <option value="">전체</option>
-            <option value="active">활동</option>
-            <option value="paired">연결만</option>
-            <option value="visited">둘러봄</option>
-            <option value="signup">가입만</option>
+            <option value="">단계 · 전체</option>
+            <option value="active">활동 — 30일 안에 뭔가 함</option>
+            <option value="paired">연결만 — 커플은 있는데 조용함</option>
+            <option value="visited">둘러봄 — 커플은 없고 흔적만</option>
+            <option value="signup">가입만 — 아무 흔적 없음</option>
           </select>
-          <input id="userQ" placeholder="이름 · 이메일 검색" style="max-width:260px">
+          <input id="userQ" placeholder="이름 · 이메일 검색" style="max-width:240px">
           <span class="muted small" id="userCount"></span>
         </div>
         <div class="split">
           <div class="tblwrap" style="max-height:70vh;overflow-y:auto">
             <table id="userTbl"></table>
           </div>
-          <div class="card" id="userDetail" style="background:var(--panel2)">
+          <div class="card sub" id="userDetail">
             <span class="muted small">왼쪽에서 사람을 고르면 자세히 보여 줍니다.</span>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 커플 -->
+    <!-- ══ 커플 ══ -->
     <section id="couples">
+      <p class="lead">방 하나가 한 줄입니다. 열 이름을 누르면 그 기준으로 정렬합니다.</p>
       <div class="card">
         <h2>커플 <span class="note" id="coupleNote"></span></h2>
         <div class="row2" style="margin-bottom:10px">
           <select id="coupleGrp" style="width:auto"></select>
-          <label class="muted small"><input type="checkbox" id="hideEmpty" style="width:auto"> 아무것도 안 한 커플 숨기기</label>
-          <label class="muted small"><input type="checkbox" id="showAllCols" style="width:auto"> 아무도 안 쓴 컨텐츠 열도 보기</label>
+          <label class="chk"><input type="checkbox" id="hideEmpty"> 아무것도 안 한 커플 숨기기</label>
+          <label class="chk"><input type="checkbox" id="showAllCols"> 아무도 안 쓴 기능 열도 보기</label>
         </div>
         <div class="tblwrap"><table id="coupleTbl"></table></div>
       </div>
     </section>
 
-    <!-- 컨텐츠 -->
+    <!-- ══ 기능 사용량 ══ -->
     <section id="content">
+      <p class="lead">어떤 기능이 실제로 쓰이는가. 막대는 30일 기준이고 가장 많이 쓰인 기능이 꽉 찬 길이입니다.
+        새 기능을 만들면 <span class="mono">ae_ops_sources</span> 표에 한 줄만 넣으면 여기 저절로 나옵니다.</p>
       <div class="card">
-        <h2>컨텐츠 사용량 <span class="note">집계 원천은 ae_ops_sources 표에 있다</span></h2>
         <div class="tblwrap"><table id="contentTbl"></table></div>
       </div>
     </section>
 
-    <!-- 문의 -->
+    <!-- ══ 문의 ══ -->
     <section id="support">
+      <p class="lead">답장을 보내면 사용자 앱에 <b>즉시</b> 뜹니다. 새 문의도 실시간으로 들어옵니다.</p>
       <div class="split">
         <div class="card" style="padding:0">
           <div class="list" id="ticketList"></div>
@@ -155,16 +169,20 @@
       </div>
     </section>
 
-    <!-- 설정 -->
+    <!-- ══ 설정 ══ -->
     <section id="config">
-      <div class="card">
-        <h2>원격 설정 <span class="note">저장하면 앱에 바로 반영된다</span></h2>
-        <div id="configList"></div>
+      <p class="lead">여기서 고치는 것은 전부 Supabase 의 <span class="mono">ae_config</span> 표입니다.
+        저장하면 <b>앱을 다시 내지 않고</b> 반영됩니다 — 앱은 켤 때와 앞으로 되돌아올 때 이 표를 다시 읽습니다.
+        각 값이 무엇을 바꾸고 누가 읽는지 아래에 적어 두었습니다.</p>
+      <div id="configList"></div>
+      <div class="card" style="margin-top:14px">
+        <h2>여기서는 못 바꾸는 것 <span class="note">왜 못 바꾸는지도 함께</span></h2>
+        <div id="cantChange"></div>
       </div>
     </section>
   </main>
 </div>
 
-<script src="app.js?v=1"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

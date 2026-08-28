@@ -198,3 +198,64 @@ svg text { font-size: 10px; fill: var(--ink3); }
   background: var(--panel); border: 1px solid var(--line); color: var(--ink);
   padding: 10px 16px; border-radius: 999px; z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,.35);
 }
+
+/* ── 새로 더한 것 (v3) ───────────────────────────────── */
+.lead {
+  margin: 0 0 12px; color: var(--ink2); font-size: 13px; line-height: 1.6;
+  max-width: 78ch;
+}
+.card.sub { background: var(--panel2); }
+.chk { display: inline-flex; align-items: center; gap: 5px; color: var(--ink2); font-size: 12px; }
+.chk input { width: auto; }
+
+/* 머리말의 실시간 표시 */
+.live {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+  color: var(--ink2); background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px 11px; font-variant-numeric: tabular-nums;
+}
+.livedetail {
+  padding: 0 16px 10px; font-size: 12px; color: var(--ink2); line-height: 1.7;
+}
+.livedetail table { font-size: 12px; max-width: 640px; }
+.livedetail td { padding: 3px 8px; }
+
+/* 한 줄 브리핑 */
+.brief { padding: 4px 16px; }
+.brief .b {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px;
+}
+.brief .b:last-child { border-bottom: 0; }
+.brief .b i {
+  flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 7px;
+  background: var(--ink3);
+}
+.brief .b.good i { background: var(--good); }
+.brief .b.warn i { background: var(--warn); }
+.brief .b.bad  i { background: var(--bad); }
+.brief .b b { font-weight: 700; }
+.brief .b .why { color: var(--ink3); font-size: 12.5px; display: block; margin-top: 2px; }
+
+/* 설정 */
+.cfg { margin-top: 12px; }
+.cfg > h3 {
+  margin: 18px 0 8px; font-size: 12px; color: var(--ink3); font-weight: 700;
+  letter-spacing: .3px;
+}
+.cfgrow { border-bottom: 1px solid var(--line); padding: 14px 0; }
+.cfgrow:last-child { border-bottom: 0; }
+.cfgrow .head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.cfgrow .head b { font-size: 14px; }
+.cfgrow .what { color: var(--ink2); font-size: 13px; margin: 5px 0 2px; line-height: 1.6; }
+.cfgrow .who { color: var(--ink3); font-size: 12px; }
+.cfgrow .danger { color: var(--warn); font-size: 12px; margin-top: 4px; }
+.cfgrow textarea { min-height: 60px; }
+.cfgrow.closed .body { display: none; }
+.cfgrow .toggle {
+  background: transparent; border: 1px solid var(--line); color: var(--ink3);
+  border-radius: 8px; padding: 2px 9px; font-size: 12px;
+}
+
+table.doc td { text-align: left; white-space: normal; vertical-align: top; padding: 8px 10px; }
+table.doc td:first-child { white-space: nowrap; }
