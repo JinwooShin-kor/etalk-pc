@@ -85,10 +85,14 @@
     -webkit-overflow-scrolling:touch; scrollbar-width:none;
   }
   .shots::-webkit-scrollbar{display:none}
+  /* **크기를 미리 못 박는다.** 높이를 안 주면 가로 스크롤 상자 안에서 자리가
+     0 이 되고, 그러면 늦게 부르기(lazy)가 「아직 화면 밖」이라 판단해 영영
+     안 깨어난다 — 그림 여섯 장이 통째로 안 떴다(2026-08-29 실측). */
   .shots img{
-    width:186px; flex:none; border-radius:20px; scroll-snap-align:center;
+    width:186px; height:auto; aspect-ratio:332/720;
+    flex:none; border-radius:20px; scroll-snap-align:center;
     border:1px solid var(--line); box-shadow:0 12px 30px -16px rgba(0,0,0,.35);
-    background:var(--surface);
+    background:var(--surface); object-fit:cover;
   }
 
   .card{
@@ -161,12 +165,12 @@
   </div>
 
   <div class="shots">
-    <img src="/shots/01.jpg" alt="애톡 홈 화면" loading="lazy" width="186">
-    <img src="/shots/02.jpg" alt="애톡 대화 화면" loading="lazy" width="186">
-    <img src="/shots/07.jpg" alt="애톡 캘린더 화면" loading="lazy" width="186">
-    <img src="/shots/08.jpg" alt="애톡 타임라인 화면" loading="lazy" width="186">
-    <img src="/shots/03.jpg" alt="애톡 비서와 대화하는 화면" loading="lazy" width="186">
-    <img src="/shots/09.jpg" alt="애톡 커플 게임 화면" loading="lazy" width="186">
+    <img src="/shots/01.jpg" alt="애톡 홈 화면" width="332" height="720">
+    <img src="/shots/02.jpg" alt="애톡 대화 화면" width="332" height="720">
+    <img src="/shots/07.jpg" alt="애톡 캘린더 화면" width="332" height="720">
+    <img src="/shots/08.jpg" alt="애톡 타임라인 화면" width="332" height="720">
+    <img src="/shots/03.jpg" alt="애톡 비서와 대화하는 화면" width="332" height="720">
+    <img src="/shots/09.jpg" alt="애톡 커플 게임 화면" width="332" height="720">
   </div>
 
   <div class="card">
