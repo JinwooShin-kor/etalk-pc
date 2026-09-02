@@ -816,6 +816,9 @@ function renderCouples() {
     renderCouples();
   });
 
+  // 테스트 탭의 커플 고르개도 같은 목록을 쓴다.
+  fillDumpCouples();
+
   // 줄을 누르면 그 커플의 행동 기록이 아래에 열린다.
   $$('#coupleTbl tbody tr').forEach((tr) => {
     tr.style.cursor = 'pointer';
@@ -895,6 +898,102 @@ function renderLog() {
   const prev = $('#logPrev'), next = $('#logNext');
   if (prev) prev.onclick = () => { if (LOG.page > 0) { LOG.page--; loadLog(); } };
   if (next) next.onclick = () => { if ((LOG.page + 1) * LOG.size < LOG.total) { LOG.page++; loadLog(); } };
+}
+
+/* ══ 테스트 — 대화 원문 ═══════════════════════════════════
+ *
+ * **행동 기록(위)은 일부러 내용을 안 준다.** 이 자리는 그 원칙의
+ * 예외다 — 비서가 무엇을 보고 무엇을 답했는지 눈으로 따라가야 할 때가
+ * 있어서 두었다. 실제 사용자의 사적인 대화이므로 필요할 때만 연다.
+ *
+ * 서버 함수(ae_ops_chat_dump)가 관리자 여부를 다시 확인한다. 화면에서
+ * 감추는 것만으로는 막는 것이 아니다.
+ */
+const DUMP = { couple: null, size: 200, page: 0, total: 0, rows: [] };
+
+function fillDumpCouples() {
+  const sel = $('#dumpCouple');
+  if (!sel) return;
+  const list = (S.couples?.rows || [])
+    .map((r) => ({ id: r.id, who: (r.people || []).map((p) => p.name).join(' · ') || '빈 방' }))
+    .filter((x) => x.id);
+  sel.innerHTML = '<option value="">커플을 고르세요</option>'
+    + list.map((x) => `<option value="${esc(x.id)}">${esc(x.who)}</option>`).join('');
+  if (DUMP.couple) sel.value = DUMP.couple;
+}
+
+async function loadDump() {
+  if (!DUMP.couple) {
+    $('#dumpTbl').innerHTML =
+      '<tbody><tr><td class="muted">커플을 고르면 대화가 나옵니다.</td></tr></tbody>';
+    $('#dumpPager').innerHTML = ''; $('#dumpNote').textContent = '';
+    return;
+  }
+  $('#dumpTbl').innerHTML = '<tbody><tr><td class="muted">읽는 중…</td></tr></tbody>';
+  try {
+    const d = await rpc('ae_ops_chat_dump', {
+      p_couple: DUMP.couple, p_limit: DUMP.size, p_offset: DUMP.page * DUMP.size,
+    });
+    DUMP.total = Number(d?.total || 0);
+    DUMP.rows = d?.rows || [];
+  } catch (e) {
+    $('#dumpTbl').innerHTML =
+      `<tbody><tr><td class="muted">못 읽었습니다 — ${esc(String(e))}</td></tr></tbody>`;
+    return;
+  }
+  renderDump();
+}
+
+function renderDump() {
+  const sel = $('#dumpCouple');
+  $('#dumpNote').textContent = sel?.selectedOptions?.[0]?.textContent || '';
+  if (!DUMP.rows.length) {
+    $('#dumpTbl').innerHTML = '<tbody><tr><td class="muted">대화가 없습니다.</td></tr></tbody>';
+    $('#dumpPager').innerHTML = '';
+    return;
+  }
+  $('#dumpTbl').innerHTML = `
+    <thead><tr><th>때</th><th>누가</th><th>종류</th><th>내용</th></tr></thead>
+    <tbody>${DUMP.rows.map((r) => {
+      const tag = r.ai ? '<span class="pill pink">비서</span>'
+        : (r.trio ? '<span class="pill">셋이서</span>' : '');
+      const kind = r.type === 'text' ? '' : `<span class="pill">${esc(r.type)}</span>`;
+      const body = r.type === 'text' || r.type === 'ai'
+        ? esc(r.body || '') : `<span class="muted">${esc(r.type)}</span>`;
+      return `<tr>
+        <td class="small muted" style="white-space:nowrap">${esc(clock(r.at))}</td>
+        <td class="small" style="white-space:nowrap">${esc(r.who)} ${tag}</td>
+        <td class="small">${kind}</td>
+        <td class="small" style="white-space:pre-wrap">${body}${
+          r.edited ? ' <span class="muted">(고침)</span>' : ''}</td>
+      </tr>`;
+    }).join('')}</tbody>`;
+
+  const pages = Math.max(1, Math.ceil(DUMP.total / DUMP.size));
+  const from = DUMP.page * DUMP.size + 1;
+  const to = Math.min(DUMP.total, (DUMP.page + 1) * DUMP.size);
+  $('#dumpPager').innerHTML = `
+    <button class="btn ghost" id="dumpPrev" ${DUMP.page === 0 ? 'disabled' : ''}>← 이전</button>
+    <span class="note">${n(DUMP.total)}줄 중 ${n(from)}–${n(to)} · ${DUMP.page + 1}/${n(pages)}쪽</span>
+    <button class="btn ghost" id="dumpNext" ${DUMP.page + 1 >= pages ? 'disabled' : ''}>다음 →</button>`;
+  const pv = $('#dumpPrev'), nx = $('#dumpNext');
+  if (pv) pv.onclick = () => { if (DUMP.page > 0) { DUMP.page--; loadDump(); } };
+  if (nx) nx.onclick = () => {
+    if ((DUMP.page + 1) * DUMP.size < DUMP.total) { DUMP.page++; loadDump(); }
+  };
+}
+
+function wireDump() {
+  const c = $('#dumpCouple'), z = $('#dumpSize'), cp = $('#dumpCopy');
+  if (c) c.onchange = () => { DUMP.couple = c.value || null; DUMP.page = 0; loadDump(); };
+  if (z) z.onchange = () => { DUMP.size = Number(z.value) || 200; DUMP.page = 0; loadDump(); };
+  if (cp) cp.onclick = async () => {
+    const txt = DUMP.rows.map((r) =>
+      `[${clock(r.at)}] ${r.who}${r.trio ? '(셋이서)' : ''}: ` +
+      (r.type === 'text' || r.type === 'ai' ? (r.body || '') : `<${r.type}>`)).join('\n');
+    try { await navigator.clipboard.writeText(txt); toast('이 쪽을 복사했습니다'); }
+    catch { toast('복사하지 못했습니다'); }
+  };
 }
 
 function wireLog() {
@@ -1283,6 +1382,7 @@ $('#seriesDays').onchange = async () => {
 };
 $('#coupleGrp').onchange = renderCouples;
 wireLog();
+wireDump();
 $('#hideEmpty').onchange = renderCouples;
 $('#showAllCols').onchange = renderCouples;
 $('#tierSel').onchange = loadUsers;

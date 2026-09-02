@@ -45,6 +45,7 @@
       <button data-tab="content">기능 사용량</button>
       <button data-tab="support">문의<span class="badge" id="openBadge" hidden>0</span></button>
       <button data-tab="config">설정</button>
+      <button data-tab="test">테스트</button>
     </nav>
   </header>
 
@@ -166,6 +167,26 @@
       </div>
     </section>
 
+    <!-- ══ 테스트 ══ -->
+    <section id="test">
+      <p class="lead">비서가 무엇을 보고 무엇을 답했는지 눈으로 따라가는 자리입니다.
+        <b>실제 사용자의 사적인 대화</b>이므로 필요할 때만 열어 보세요.</p>
+      <div class="card">
+        <h2>대화 원문 <span class="note" id="dumpNote"></span></h2>
+        <div class="row2" style="margin-bottom:10px">
+          <select id="dumpCouple" style="width:auto"></select>
+          <select id="dumpSize" style="width:auto">
+            <option value="200">200줄씩</option>
+            <option value="500">500줄씩</option>
+            <option value="1000">1000줄씩</option>
+          </select>
+          <button id="dumpCopy" class="btn ghost">이 쪽 복사</button>
+        </div>
+        <div class="tblwrap"><table id="dumpTbl"></table></div>
+        <div class="row2" id="dumpPager" style="margin-top:10px"></div>
+      </div>
+    </section>
+
     <!-- ══ 기능 사용량 ══ -->
     <section id="content">
       <p class="lead">어떤 기능이 실제로 쓰이는가. 막대는 30일 기준이고 가장 많이 쓰인 기능이 꽉 찬 길이입니다.
@@ -202,6 +223,6 @@
   </main>
 </div>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
