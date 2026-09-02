@@ -145,6 +145,25 @@
         </div>
         <div class="tblwrap"><table id="coupleTbl"></table></div>
       </div>
+
+      <!-- 한 커플의 행동을 시간순으로. 커플 줄을 누르면 열린다. -->
+      <div class="card" id="logCard" hidden>
+        <h2>행동 기록 <span class="note" id="logWho"></span></h2>
+        <p class="lead">콕·게임·컨텐츠·메시지를 시간순으로 늘어놓습니다.
+          <b>대화 내용은 나오지 않습니다</b> — 무엇을 보냈는지(글·사진·스티커)와
+          비서와 셋이서 보낸 것인지만 딱지로 남습니다.</p>
+        <div class="row2" style="margin-bottom:10px">
+          <select id="logGrp" style="width:auto"></select>
+          <select id="logSize" style="width:auto">
+            <option value="100">100줄씩</option>
+            <option value="200">200줄씩</option>
+            <option value="500">500줄씩</option>
+          </select>
+          <button id="logClose" class="btn ghost">닫기</button>
+        </div>
+        <div class="tblwrap"><table id="logTbl"></table></div>
+        <div class="row2" id="logPager" style="margin-top:10px"></div>
+      </div>
     </section>
 
     <!-- ══ 기능 사용량 ══ -->
@@ -183,6 +202,6 @@
   </main>
 </div>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

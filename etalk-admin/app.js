@@ -793,7 +793,8 @@ function renderCouples() {
       const solo = Number(r.members || 0) < 2 ? ' <span class="pill warn">혼자</span>' : '';
       const plan = r.plan === 'free'
         ? '<span class="pill">무료</span>' : `<span class="pill pink">${esc(r.plan)}</span>`;
-      return `<tr>
+      const plain = (r.people || []).map((p) => p.name).join(' · ') || '빈 방';
+      return `<tr data-id="${esc(r.id)}" data-who="${esc(plain)}">
         <td>${who}${solo} ${r.status !== 'active' ? `<span class="pill">${esc(r.status)}</span>` : ''}</td>
         <td>${plan}</td>
         <td class="small muted">${ago(r.last_talk)}</td>
@@ -814,6 +815,93 @@ function renderCouples() {
     else { S.coupleSort = k; S.coupleDesc = true; }
     renderCouples();
   });
+
+  // 줄을 누르면 그 커플의 행동 기록이 아래에 열린다.
+  $$('#coupleTbl tbody tr').forEach((tr) => {
+    tr.style.cursor = 'pointer';
+    tr.onclick = () => openLog(tr.dataset.id, tr.dataset.who);
+  });
+}
+
+/* ══ 커플 행동 기록 ═══════════════════════════════════════
+ *
+ * **모든 줄을 볼 수 있어야 한다.** 커플 하나가 삼천 줄이 넘으므로
+ * 페이지로 끊고, 몇 줄 중 몇 번째인지 늘 적어 둔다.
+ *
+ * **대화 내용은 안 가져온다.** 서버 함수가 애초에 안 준다 — 운영자가
+ * 남의 대화를 읽을 일은 없다. 무엇을 보냈는지와 「비서와 셋이서」 여부만
+ * 딱지로 온다.
+ */
+const LOG = { couple: null, who: '', grp: '', size: 100, page: 0, total: 0, rows: [] };
+
+async function openLog(id, who) {
+  if (!id) return;
+  LOG.couple = id; LOG.who = who || ''; LOG.page = 0;
+  $('#logCard').hidden = false;
+  $('#logWho').textContent = LOG.who;
+  // 갈래 고르개는 커플 표가 쓰는 그 목록을 그대로 쓴다.
+  const grps = [...new Set((S.couples?.sources || []).map((c) => c.grp))];
+  $('#logGrp').innerHTML = '<option value="">모든 갈래</option>'
+    + grps.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
+  $('#logGrp').value = LOG.grp;
+  await loadLog();
+  $('#logCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function loadLog() {
+  const tb = $('#logTbl');
+  tb.innerHTML = '<tbody><tr><td class="muted">읽는 중…</td></tr></tbody>';
+  try {
+    const d = await rpc('ae_ops_couple_log', {
+      p_couple: LOG.couple,
+      p_limit: LOG.size,
+      p_offset: LOG.page * LOG.size,
+      p_group: LOG.grp || null,
+    });
+    LOG.total = Number(d?.total || 0);
+    LOG.rows = d?.rows || [];
+  } catch (e) {
+    tb.innerHTML = `<tbody><tr><td class="muted">못 읽었습니다 — ${esc(String(e))}</td></tr></tbody>`;
+    return;
+  }
+  renderLog();
+}
+
+function renderLog() {
+  const rows = LOG.rows;
+  if (!rows.length) {
+    $('#logTbl').innerHTML =
+      '<tbody><tr><td class="muted">이 갈래에는 기록이 없습니다.</td></tr></tbody>';
+    $('#logPager').innerHTML = '';
+    return;
+  }
+  $('#logTbl').innerHTML = `
+    <thead><tr><th>때</th><th>갈래</th><th>무엇</th><th>누가</th><th>곁들임</th></tr></thead>
+    <tbody>${rows.map((r) => `<tr>
+      <td class="small muted">${esc(clock(r.at))}</td>
+      <td class="small"><span class="pill">${esc(r.grp || '')}</span></td>
+      <td>${esc(r.label || '')}</td>
+      <td class="small">${r.who ? esc(r.who) : '<span class="muted">·</span>'}</td>
+      <td class="small">${r.detail ? esc(r.detail) : '<span class="muted">·</span>'}</td>
+    </tr>`).join('')}</tbody>`;
+
+  const pages = Math.max(1, Math.ceil(LOG.total / LOG.size));
+  const from = LOG.page * LOG.size + 1;
+  const to = Math.min(LOG.total, (LOG.page + 1) * LOG.size);
+  $('#logPager').innerHTML = `
+    <button class="btn ghost" id="logPrev" ${LOG.page === 0 ? 'disabled' : ''}>← 이전</button>
+    <span class="note">${n(LOG.total)}줄 중 ${n(from)}–${n(to)} · ${LOG.page + 1}/${n(pages)}쪽</span>
+    <button class="btn ghost" id="logNext" ${LOG.page + 1 >= pages ? 'disabled' : ''}>다음 →</button>`;
+  const prev = $('#logPrev'), next = $('#logNext');
+  if (prev) prev.onclick = () => { if (LOG.page > 0) { LOG.page--; loadLog(); } };
+  if (next) next.onclick = () => { if ((LOG.page + 1) * LOG.size < LOG.total) { LOG.page++; loadLog(); } };
+}
+
+function wireLog() {
+  const g = $('#logGrp'), z = $('#logSize'), c = $('#logClose');
+  if (g) g.onchange = () => { LOG.grp = g.value; LOG.page = 0; loadLog(); };
+  if (z) z.onchange = () => { LOG.size = Number(z.value) || 100; LOG.page = 0; loadLog(); };
+  if (c) c.onclick = () => { $('#logCard').hidden = true; };
 }
 
 /* ══ 기능 사용량 ═══════════════════════════════════════ */
@@ -1194,6 +1282,7 @@ $('#seriesDays').onchange = async () => {
   renderSeries();
 };
 $('#coupleGrp').onchange = renderCouples;
+wireLog();
 $('#hideEmpty').onchange = renderCouples;
 $('#showAllCols').onchange = renderCouples;
 $('#tierSel').onchange = loadUsers;
