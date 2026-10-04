@@ -117,6 +117,10 @@ const S = {
   users: null, tickets: null, config: null, live: null,
   retention: null, audit: null,
   ticketId: null, userId: null,
+  userPage: 0, userSize: 50, userRequest: 0, userLoading: false, detailRequest: 0,
+  configDrafts: new Map(), configExpanded: new Set(), ticketDrafts: new Map(),
+  ticketPending: new Set(), configPending: new Set(),
+  sessionEpoch: 0, ticketRequest: 0, configRequest: 0,
   coupleSort: 'last_talk', coupleDesc: true,
   contentSort: 'total', contentDesc: true,
   lastFull: 0, lastLive: 0, failed: 0,
@@ -207,11 +211,14 @@ const RT = {
 
 /** 서버가 「바뀌었다」고 밀어 준 순간. 바뀐 표에 맞는 것만 다시 읽는다. */
 async function onPush(table) {
+  const epoch = S.sessionEpoch;
   try {
     if (table === 'ae_tickets' || table === 'ae_ticket_messages') {
       await loadTickets();
+      if (epoch !== S.sessionEpoch) return;
       toast('문의가 움직였습니다');
     }
+    if (epoch !== S.sessionEpoch) return;
     await loadLive();
   } catch { /* 다음 폴링이 따라잡는다 */ }
 }
@@ -688,7 +695,7 @@ function renderUsers() {
     <thead><tr>${head.map((h) => `<th class="noSort">${h}</th>`).join('')}</tr></thead>
     <tbody>${(d.rows || []).map((r) => {
       const [tl, tc] = TIER[r.tier] || ['?', ''];
-      return `<tr class="clickable" data-id="${r.id}">
+      return `<tr class="clickable ${r.id === S.userId ? 'selected' : ''}" tabindex="0" data-id="${esc(r.id)}">
         <td>${esc(r.nickname || '이름없음')}${r.is_admin ? ' <span class="pill pink">운영</span>' : ''}</td>
         <td><span class="pill ${tc}">${tl}</span></td>
         <td class="small muted">${esc(r.provider || '?')}</td>
@@ -698,14 +705,24 @@ function renderUsers() {
         <td class="small muted">${ago(r.last_act)}</td>
         <td class="small muted">${ago(r.joined)}</td></tr>`;
     }).join('')}</tbody>`;
-  $$('#userTbl tbody tr').forEach((tr) => tr.onclick = () => openUser(tr.dataset.id));
+  $$('#userTbl tbody tr[data-id]').forEach((tr) => {
+    tr.onclick = () => openUser(tr.dataset.id);
+    tr.onkeydown = (event) => { if (event.key === 'Enter') openUser(tr.dataset.id); };
+  });
+  if (!(d.rows || []).length) $('#userTbl').innerHTML = '<tbody><tr><td class="empty-state">검색 조건에 맞는 사용자가 없습니다.</td></tr></tbody>';
+  renderRecordPager('user', { page: S.userPage, size: S.userSize, total: Number(d.total || 0), loading: S.userLoading }, (page) => {
+    S.userPage = page; $('#userTbl').parentElement.scrollTop = 0; loadUsers();
+  });
 }
 
 async function openUser(id) {
   S.userId = id;
+  const request = ++S.detailRequest;
+  $$('#userTbl tr[data-id]').forEach((tr) => tr.classList.toggle('selected', tr.dataset.id === id));
   $('#userDetail').innerHTML = '<span class="muted small">읽는 중…</span>';
   try {
     const d = await rpc('ae_ops_user', { p_id: id });
+    if (request !== S.detailRequest || S.userId !== id) return;
     const w = d.who || {};
     const [tl, tc] = TIER[w.tier] || ['?', ''];
     $('#userDetail').innerHTML = `
@@ -737,6 +754,7 @@ async function openUser(id) {
            <span class="muted"> · ${clock(r.at)}</span></div>`).join('')
           || '<span class="muted small">없음</span>'}</div>`;
   } catch (e) {
+    if (request !== S.detailRequest || S.userId !== id) return;
     $('#userDetail').innerHTML = `<span class="err">${esc(e.message)}</span>`;
   }
 }
@@ -762,6 +780,8 @@ function renderCouples() {
 
   let rows = [...(d.rows || [])];
   const all = rows.length;
+  const query = $('#coupleSearch').value.trim().toLocaleLowerCase();
+  if (query) rows = rows.filter((r) => (r.people || []).some((p) => String(p.name || '').toLocaleLowerCase().includes(query)));
   if ($('#hideEmpty').checked) {
     rows = rows.filter((r) => Object.values(r.counts || {}).some((v) => Number(v) > 0));
   }
@@ -777,7 +797,7 @@ function renderCouples() {
   });
 
   const fixed = [
-    ['who', '커플', false], ['plan', '요금제', false], ['last_talk', '마지막 대화', true],
+    ['who', '커플', false], ['plan', '기존 이용등급', false], ['last_talk', '마지막 대화', true],
     ['hearts_bought', '충전', true], ['hearts_spent', '소모', true], ['hearts_now', '지갑', true],
     ['ai_chat', '비서', true],
   ];
@@ -826,187 +846,11 @@ function renderCouples() {
   });
 }
 
-/* ══ 커플 행동 기록 ═══════════════════════════════════════
- *
- * **모든 줄을 볼 수 있어야 한다.** 커플 하나가 삼천 줄이 넘으므로
- * 페이지로 끊고, 몇 줄 중 몇 번째인지 늘 적어 둔다.
- *
- * **대화 내용은 안 가져온다.** 서버 함수가 애초에 안 준다 — 운영자가
- * 남의 대화를 읽을 일은 없다. 무엇을 보냈는지와 「비서와 셋이서」 여부만
- * 딱지로 온다.
- */
-const LOG = { couple: null, who: '', grp: '', size: 100, page: 0, total: 0, rows: [] };
-
-async function openLog(id, who) {
-  if (!id) return;
-  LOG.couple = id; LOG.who = who || ''; LOG.page = 0;
-  $('#logCard').hidden = false;
-  $('#logWho').textContent = LOG.who;
-  // 갈래 고르개는 커플 표가 쓰는 그 목록을 그대로 쓴다.
-  const grps = [...new Set((S.couples?.sources || []).map((c) => c.grp))];
-  $('#logGrp').innerHTML = '<option value="">모든 갈래</option>'
-    + grps.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
-  $('#logGrp').value = LOG.grp;
-  await loadLog();
-  $('#logCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-async function loadLog() {
-  const tb = $('#logTbl');
-  tb.innerHTML = '<tbody><tr><td class="muted">읽는 중…</td></tr></tbody>';
-  try {
-    const d = await rpc('ae_ops_couple_log', {
-      p_couple: LOG.couple,
-      p_limit: LOG.size,
-      p_offset: LOG.page * LOG.size,
-      p_group: LOG.grp || null,
-    });
-    LOG.total = Number(d?.total || 0);
-    LOG.rows = d?.rows || [];
-  } catch (e) {
-    tb.innerHTML = `<tbody><tr><td class="muted">못 읽었습니다 — ${esc(String(e))}</td></tr></tbody>`;
-    return;
-  }
-  renderLog();
-}
-
-function renderLog() {
-  const rows = LOG.rows;
-  if (!rows.length) {
-    $('#logTbl').innerHTML =
-      '<tbody><tr><td class="muted">이 갈래에는 기록이 없습니다.</td></tr></tbody>';
-    $('#logPager').innerHTML = '';
-    return;
-  }
-  $('#logTbl').innerHTML = `
-    <thead><tr><th>때</th><th>갈래</th><th>무엇</th><th>누가</th><th>곁들임</th></tr></thead>
-    <tbody>${rows.map((r) => `<tr>
-      <td class="small muted">${esc(clock(r.at))}</td>
-      <td class="small"><span class="pill">${esc(r.grp || '')}</span></td>
-      <td>${esc(r.label || '')}</td>
-      <td class="small">${r.who ? esc(r.who) : '<span class="muted">·</span>'}</td>
-      <td class="small">${r.detail ? esc(r.detail) : '<span class="muted">·</span>'}</td>
-    </tr>`).join('')}</tbody>`;
-
-  const pages = Math.max(1, Math.ceil(LOG.total / LOG.size));
-  const from = LOG.page * LOG.size + 1;
-  const to = Math.min(LOG.total, (LOG.page + 1) * LOG.size);
-  $('#logPager').innerHTML = `
-    <button class="btn ghost" id="logPrev" ${LOG.page === 0 ? 'disabled' : ''}>← 이전</button>
-    <span class="note">${n(LOG.total)}줄 중 ${n(from)}–${n(to)} · ${LOG.page + 1}/${n(pages)}쪽</span>
-    <button class="btn ghost" id="logNext" ${LOG.page + 1 >= pages ? 'disabled' : ''}>다음 →</button>`;
-  const prev = $('#logPrev'), next = $('#logNext');
-  if (prev) prev.onclick = () => { if (LOG.page > 0) { LOG.page--; loadLog(); } };
-  if (next) next.onclick = () => { if ((LOG.page + 1) * LOG.size < LOG.total) { LOG.page++; loadLog(); } };
-}
-
-/* ══ 테스트 — 대화 원문 ═══════════════════════════════════
- *
- * **행동 기록(위)은 일부러 내용을 안 준다.** 이 자리는 그 원칙의
- * 예외다 — 비서가 무엇을 보고 무엇을 답했는지 눈으로 따라가야 할 때가
- * 있어서 두었다. 실제 사용자의 사적인 대화이므로 필요할 때만 연다.
- *
- * 서버 함수(ae_ops_chat_dump)가 관리자 여부를 다시 확인한다. 화면에서
- * 감추는 것만으로는 막는 것이 아니다.
- */
-const DUMP = { couple: null, size: 200, page: 0, total: 0, rows: [] };
-
-function fillDumpCouples() {
-  const sel = $('#dumpCouple');
-  if (!sel) return;
-  const list = (S.couples?.rows || [])
-    .map((r) => ({ id: r.id, who: (r.people || []).map((p) => p.name).join(' · ') || '빈 방' }))
-    .filter((x) => x.id);
-  sel.innerHTML = '<option value="">커플을 고르세요</option>'
-    + list.map((x) => `<option value="${esc(x.id)}">${esc(x.who)}</option>`).join('');
-  if (DUMP.couple) sel.value = DUMP.couple;
-}
-
-async function loadDump() {
-  if (!DUMP.couple) {
-    $('#dumpTbl').innerHTML =
-      '<tbody><tr><td class="muted">커플을 고르면 대화가 나옵니다.</td></tr></tbody>';
-    $('#dumpPager').innerHTML = ''; $('#dumpNote').textContent = '';
-    return;
-  }
-  $('#dumpTbl').innerHTML = '<tbody><tr><td class="muted">읽는 중…</td></tr></tbody>';
-  try {
-    const d = await rpc('ae_ops_chat_dump', {
-      p_couple: DUMP.couple, p_limit: DUMP.size, p_offset: DUMP.page * DUMP.size,
-    });
-    DUMP.total = Number(d?.total || 0);
-    DUMP.rows = d?.rows || [];
-  } catch (e) {
-    $('#dumpTbl').innerHTML =
-      `<tbody><tr><td class="muted">못 읽었습니다 — ${esc(String(e))}</td></tr></tbody>`;
-    return;
-  }
-  renderDump();
-}
-
-function renderDump() {
-  const sel = $('#dumpCouple');
-  $('#dumpNote').textContent = sel?.selectedOptions?.[0]?.textContent || '';
-  if (!DUMP.rows.length) {
-    $('#dumpTbl').innerHTML = '<tbody><tr><td class="muted">대화가 없습니다.</td></tr></tbody>';
-    $('#dumpPager').innerHTML = '';
-    return;
-  }
-  $('#dumpTbl').innerHTML = `
-    <thead><tr><th>때</th><th>누가</th><th>종류</th><th>내용</th></tr></thead>
-    <tbody>${DUMP.rows.map((r) => {
-      const tag = r.ai ? '<span class="pill pink">비서</span>'
-        : (r.trio ? '<span class="pill">셋이서</span>' : '');
-      const kind = r.type === 'text' ? '' : `<span class="pill">${esc(r.type)}</span>`;
-      const body = r.type === 'text' || r.type === 'ai'
-        ? esc(r.body || '') : `<span class="muted">${esc(r.type)}</span>`;
-      return `<tr>
-        <td class="small muted" style="white-space:nowrap">${esc(clock(r.at))}</td>
-        <td class="small" style="white-space:nowrap">${esc(r.who)} ${tag}</td>
-        <td class="small">${kind}</td>
-        <td class="small" style="white-space:pre-wrap">${body}${
-          r.edited ? ' <span class="muted">(고침)</span>' : ''}</td>
-      </tr>`;
-    }).join('')}</tbody>`;
-
-  const pages = Math.max(1, Math.ceil(DUMP.total / DUMP.size));
-  const from = DUMP.page * DUMP.size + 1;
-  const to = Math.min(DUMP.total, (DUMP.page + 1) * DUMP.size);
-  $('#dumpPager').innerHTML = `
-    <button class="btn ghost" id="dumpPrev" ${DUMP.page === 0 ? 'disabled' : ''}>← 이전</button>
-    <span class="note">${n(DUMP.total)}줄 중 ${n(from)}–${n(to)} · ${DUMP.page + 1}/${n(pages)}쪽</span>
-    <button class="btn ghost" id="dumpNext" ${DUMP.page + 1 >= pages ? 'disabled' : ''}>다음 →</button>`;
-  const pv = $('#dumpPrev'), nx = $('#dumpNext');
-  if (pv) pv.onclick = () => { if (DUMP.page > 0) { DUMP.page--; loadDump(); } };
-  if (nx) nx.onclick = () => {
-    if ((DUMP.page + 1) * DUMP.size < DUMP.total) { DUMP.page++; loadDump(); }
-  };
-}
-
-function wireDump() {
-  const c = $('#dumpCouple'), z = $('#dumpSize'), cp = $('#dumpCopy');
-  if (c) c.onchange = () => { DUMP.couple = c.value || null; DUMP.page = 0; loadDump(); };
-  if (z) z.onchange = () => { DUMP.size = Number(z.value) || 200; DUMP.page = 0; loadDump(); };
-  if (cp) cp.onclick = async () => {
-    const txt = DUMP.rows.map((r) =>
-      `[${clock(r.at)}] ${r.who}${r.trio ? '(셋이서)' : ''}: ` +
-      (r.type === 'text' || r.type === 'ai' ? (r.body || '') : `<${r.type}>`)).join('\n');
-    try { await navigator.clipboard.writeText(txt); toast('이 쪽을 복사했습니다'); }
-    catch { toast('복사하지 못했습니다'); }
-  };
-}
-
-function wireLog() {
-  const g = $('#logGrp'), z = $('#logSize'), c = $('#logClose');
-  if (g) g.onchange = () => { LOG.grp = g.value; LOG.page = 0; loadLog(); };
-  if (z) z.onchange = () => { LOG.size = Number(z.value) || 100; LOG.page = 0; loadLog(); };
-  if (c) c.onclick = () => { $('#logCard').hidden = true; };
-}
-
 /* ══ 기능 사용량 ═══════════════════════════════════════ */
 function renderContent() {
-  const rows = [...(S.content || [])];
-  if (!rows.length) return;
+  const query = $('#contentSearch').value.trim().toLocaleLowerCase();
+  const rows = [...(S.content || [])].filter((r) => !query || `${r.label} ${r.grp}`.toLocaleLowerCase().includes(query));
+  if (!rows.length) { $('#contentTbl').innerHTML = '<tbody><tr><td class="empty-state">검색 조건에 맞는 기능이 없습니다.</td></tr></tbody>'; return; }
   rows.sort((a, b) => {
     const c = Number(a[S.contentSort] || 0) - Number(b[S.contentSort] || 0);
     return S.contentDesc ? -c : c;
@@ -1046,8 +890,27 @@ function renderContent() {
 /* ══ 문의 ══════════════════════════════════════════════ */
 const TSTATUS = { open: ['기다리는 중', 'bad'], answered: ['답함', 'good'], closed: ['닫음', ''] };
 
+function captureEditorState(element) {
+  if (!element || document.activeElement !== element) return null;
+  return {
+    start: element.selectionStart, end: element.selectionEnd, direction: element.selectionDirection,
+    top: element.scrollTop, left: element.scrollLeft,
+  };
+}
+
+function restoreEditorState(element, state) {
+  if (!element || !state) return;
+  element.focus({ preventScroll: true });
+  element.setSelectionRange(state.start, state.end, state.direction || 'none');
+  element.scrollTop = state.top; element.scrollLeft = state.left;
+}
+
 function renderTickets() {
-  const list = S.tickets || [];
+  const query = $('#ticketSearch').value.trim().toLocaleLowerCase();
+  const status = $('#ticketStatus').value;
+  const list = (S.tickets || []).filter((t) => (!status || t.status === status) && (!query || `${t.subject || ''} ${t.who || ''}`.toLocaleLowerCase().includes(query)));
+  if (!S.ticketId && list.length) S.ticketId = list[0].id;
+  const listScroll = $('#ticketList').scrollTop;
   $('#ticketList').innerHTML = list.map((t) => {
     const [l, c] = TSTATUS[t.status] || [t.status, ''];
     return `<div class="item ${t.id === S.ticketId ? 'on' : ''}" data-id="${t.id}">
@@ -1057,7 +920,7 @@ function renderTickets() {
   }).join('') || '<div class="item"><span class="muted small">들어온 문의가 없어요</span></div>';
   $$('#ticketList .item[data-id]').forEach((el) =>
     el.onclick = () => { S.ticketId = el.dataset.id; renderTickets(); });
-  if (!S.ticketId && list.length) S.ticketId = list[0].id;
+  $('#ticketList').scrollTop = listScroll;
   renderTicket();
 }
 
@@ -1066,7 +929,13 @@ function renderTicket() {
   if (!t) { $('#ticketPane').innerHTML = '<span class="muted small">왼쪽에서 문의를 고르세요.</span>'; return; }
   const [l, c] = TSTATUS[t.status] || [t.status, ''];
   // 쓰던 답장을 실시간 갱신이 지워 버리면 안 된다.
-  const draft = $('#replyBox')?.value || '';
+  const draft = S.ticketDrafts.get(t.id) || '';
+  const oldScroll = $('#ticketPane .msgs')?.scrollTop || 0;
+  const sameTicket = $('#ticketPane').dataset.ticket === t.id;
+  const editorState = sameTicket ? captureEditorState($('#replyBox')) : null;
+  // IME 조합 중에는 입력 요소를 교체하지 않는다.
+  if (sameTicket && $('#replyBox')?.dataset.composing === 'true') return;
+  $('#ticketPane').dataset.ticket = t.id;
   $('#ticketPane').innerHTML = `
     <h2>${esc(t.subject || '(제목 없음)')} <span class="pill ${c}">${l}</span>
       <span class="note">${esc(t.category || '')}</span></h2>
@@ -1080,30 +949,51 @@ function renderTicket() {
       </div>`).join('')}</div>
     <textarea id="replyBox" placeholder="답장을 씁니다. 보내면 사용자 앱에 바로 뜹니다.">${esc(draft)}</textarea>
     <div class="row2" style="margin-top:8px">
-      <button class="btn" id="sendReply" type="button">답장 보내기</button>
+      <button class="btn" id="sendReply" type="button"${S.ticketPending.has(t.id) ? ' disabled' : ''}>답장 보내기</button>
       <button class="btn ghost" data-st="closed" type="button">닫기</button>
       <button class="btn ghost" data-st="open" type="button">다시 열기</button>
       <span class="err small" id="replyErr"></span>
     </div>`;
 
+  $('#ticketPane .msgs').scrollTop = sameTicket ? oldScroll : 0;
+  $('#replyBox').oninput = (event) => S.ticketDrafts.set(t.id, event.target.value);
+  $('#replyBox').oncompositionstart = (event) => { event.target.dataset.composing = 'true'; };
+  $('#replyBox').oncompositionend = (event) => { event.target.dataset.composing = 'false'; };
+  restoreEditorState($('#replyBox'), editorState);
   $('#sendReply').onclick = async () => {
+    if (S.ticketPending.has(t.id) || $('#ticketPane').dataset.ticket !== t.id) return;
     const box = $('#replyBox');
-    const body = box.value.trim();
+    const submittedText = box.value;
+    const body = submittedText.trim();
     if (!body) return;
+    const epoch = S.sessionEpoch;
+    S.ticketPending.add(t.id);
     $('#sendReply').disabled = true;
     try {
       await rpc('ae_ops_reply', { p_ticket: t.id, p_body: body });
-      box.value = '';
+      if (epoch !== S.sessionEpoch) return;
+      if (S.ticketDrafts.get(t.id) === submittedText) S.ticketDrafts.delete(t.id);
+      if ($('#ticketPane').dataset.ticket === t.id && $('#replyBox')?.value === submittedText) {
+        $('#replyBox').value = '';
+      }
       toast('보냈습니다');
       await loadTickets();
-    } catch (e) { $('#replyErr').textContent = e.message; }
-    finally { const b = $('#sendReply'); if (b) b.disabled = false; }
+    } catch (e) {
+      if (epoch === S.sessionEpoch && $('#ticketPane').dataset.ticket === t.id) $('#replyErr').textContent = e.message;
+    } finally {
+      if (epoch === S.sessionEpoch) {
+        S.ticketPending.delete(t.id);
+        if ($('#ticketPane').dataset.ticket === t.id && $('#sendReply')) $('#sendReply').disabled = false;
+      }
+    }
   };
   $$('#ticketPane button[data-st]').forEach((b) => b.onclick = async () => {
+    const epoch = S.sessionEpoch;
     try {
       await rpc('ae_ops_ticket_status', { p_ticket: t.id, p_status: b.dataset.st });
+      if (epoch !== S.sessionEpoch) return;
       await loadTickets();
-    } catch (e) { toast(e.message); }
+    } catch (e) { if (epoch === S.sessionEpoch) toast(e.message); }
   });
 }
 
@@ -1173,6 +1063,12 @@ const CANT_CHANGE = [
 
 function renderConfig() {
   const c = S.config; if (!c) return;
+  const activeEditor = $('#configList').contains(document.activeElement)
+    && document.activeElement.matches('textarea[data-k]') ? document.activeElement : null;
+  if (activeEditor?.dataset.composing === 'true') return;
+  const editorKey = activeEditor?.dataset.k;
+  const editorState = captureEditorState(activeEditor);
+  const listScroll = $('#configList').scrollTop;
   const known = new Set(CFG_GROUPS.flatMap(([, ks]) => ks));
   const rest = Object.keys(c).filter((k) => !known.has(k)).sort();
   const groups = rest.length ? [...CFG_GROUPS, ['설명이 아직 없는 값', rest]] : CFG_GROUPS;
@@ -1180,20 +1076,23 @@ function renderConfig() {
   $('#configList').innerHTML = groups.map(([title, keys]) => {
     const rows = keys.filter((k) => k in c).map((k) => {
       const doc = CFG_DOC[k] || {};
-      const json = JSON.stringify(c[k].value, null, 2);
-      const big = json.length > 300;
-      return `<div class="cfgrow ${big ? 'closed' : ''}">
+      const serverJson = JSON.stringify(c[k].value, null, 2);
+      const json = S.configDrafts.get(k) ?? serverJson;
+      const big = serverJson.length > 300;
+      const closed = big && !S.configExpanded.has(k) && !S.configDrafts.has(k);
+      return `<div class="cfgrow ${closed ? 'closed' : ''}" data-config-key="${esc(k)}">
         <div class="head"><b class="mono">${esc(k)}</b>
           <span class="muted small">${ago(c[k].updated_at)} 고침</span>
           <span class="spacer"></span>
-          ${big ? '<button class="toggle" type="button">펼치기</button>' : ''}</div>
+          ${S.configDrafts.has(k) ? '<span class="dirty-label">저장하지 않은 변경</span>' : ''}
+          ${big ? `<button class="toggle" type="button">${closed ? '펼치기' : '접기'}</button>` : ''}</div>
         <div class="what">${doc.what || '<span class="muted">설명이 아직 없습니다.</span>'}</div>
         <div class="who">읽는 곳: ${esc(doc.who || '?')}</div>
         ${doc.danger ? `<div class="danger">⚠ ${doc.danger}</div>` : ''}
         <div class="body">
           <textarea class="mono" data-k="${esc(k)}" style="margin-top:8px">${esc(json)}</textarea>
           <div class="row2" style="margin-top:6px">
-            <button class="btn ghost" data-save="${esc(k)}" type="button">저장</button>
+            <button class="btn ghost" data-save="${esc(k)}" type="button"${S.configPending.has(k) ? ' disabled' : ''}>저장</button>
             <span class="err small" data-err="${esc(k)}"></span>
           </div>
         </div>
@@ -1205,28 +1104,65 @@ function renderConfig() {
   $$('#configList .toggle').forEach((b) => b.onclick = () => {
     const row = b.closest('.cfgrow');
     row.classList.toggle('closed');
-    b.textContent = row.classList.contains('closed') ? '펼치기' : '접기';
+    const closed = row.classList.contains('closed');
+    b.textContent = closed ? '펼치기' : '접기';
+    if (closed) S.configExpanded.delete(row.dataset.configKey); else S.configExpanded.add(row.dataset.configKey);
   });
+
+  $$('#configList textarea[data-k]').forEach((ta) => {
+    ta.oncompositionstart = () => { ta.dataset.composing = 'true'; };
+    ta.oncompositionend = () => { ta.dataset.composing = 'false'; };
+    ta.oninput = () => {
+      const key = ta.dataset.k;
+      if (!S.configPending.has(key) && ta.value === JSON.stringify(S.config[key].value, null, 2)) S.configDrafts.delete(key);
+      else S.configDrafts.set(key, ta.value);
+      const row = ta.closest('.cfgrow'), existing = row.querySelector('.dirty-label');
+      if (S.configDrafts.has(key) && !existing) { const label = document.createElement('span'); label.className = 'dirty-label'; label.textContent = '저장하지 않은 변경'; row.querySelector('.head').appendChild(label); }
+      if (!S.configDrafts.has(key)) existing?.remove();
+    };
+  });
+  window.AeConsoleUI?.refreshConfig();
+  if (editorKey) restoreEditorState($(`#configList textarea[data-k="${CSS.escape(editorKey)}"]`), editorState);
+  $('#configList').scrollTop = listScroll;
 
   $$('#configList button[data-save]').forEach((b) => b.onclick = async () => {
     const k = b.dataset.save;
+    if (S.configPending.has(k)) return;
     const ta = $(`#configList textarea[data-k="${CSS.escape(k)}"]`);
     const err = $(`#configList [data-err="${CSS.escape(k)}"]`);
+    const submittedText = ta.value;
     err.textContent = '';
     let v;
-    try { v = JSON.parse(ta.value); }
+    try { v = JSON.parse(submittedText); }
     catch { err.textContent = 'JSON 형식이 아닙니다 — 따옴표와 쉼표를 확인하세요'; return; }
     // 되돌리기 어려운 것 하나만 다시 묻는다.
     if (k === 'min_build' && Number(v) > 0 &&
         !confirm(`최소 빌드를 ${v} 로 올립니다.\n이보다 낮은 빌드를 쓰는 사람은 앱이 막힙니다. 계속할까요?`)) return;
+    const epoch = S.sessionEpoch;
+    S.configPending.add(k); S.configRequest++;
     b.disabled = true;
     try {
       await rpc('ae_ops_set_config', { p_key: k, p_value: v });
+      if (epoch !== S.sessionEpoch) return;
+      if (S.configDrafts.get(k) === submittedText) S.configDrafts.delete(k);
       toast(`${k} 저장했습니다`);
-      S.config = await rpc('ae_ops_config');
+      const request = ++S.configRequest;
+      const config = await rpc('ae_ops_config');
+      if (epoch !== S.sessionEpoch || request !== S.configRequest) return;
+      S.config = config;
       renderConfig();
-    } catch (e) { err.textContent = e.message; }
-    finally { b.disabled = false; }
+    } catch (e) {
+      if (epoch === S.sessionEpoch) {
+        const currentError = $(`#configList [data-err="${CSS.escape(k)}"]`);
+        if (currentError) currentError.textContent = e.message;
+      }
+    } finally {
+      if (epoch === S.sessionEpoch) {
+        S.configPending.delete(k);
+        const currentButton = $(`#configList button[data-save="${CSS.escape(k)}"]`);
+        if (currentButton) currentButton.disabled = false;
+      }
+    }
   });
 
   $('#cantChange').innerHTML = `<table class="doc"><tbody>${
@@ -1236,23 +1172,44 @@ function renderConfig() {
 
 /* ══ 불러오기 ══════════════════════════════════════════ */
 async function loadLive() {
-  S.live = await rpc('ae_ops_live');
+  const epoch = S.sessionEpoch;
+  const live = await rpc('ae_ops_live');
+  if (epoch !== S.sessionEpoch) return;
+  S.live = live;
   S.lastLive = Date.now();
   renderLive(); renderBrief();
 }
 async function loadTickets() {
-  S.tickets = await rpc('ae_ops_tickets', { p_limit: 200 });
+  const epoch = S.sessionEpoch, request = ++S.ticketRequest;
+  const tickets = await rpc('ae_ops_tickets', { p_limit: 200 });
+  if (epoch !== S.sessionEpoch || request !== S.ticketRequest) return;
+  S.tickets = tickets;
   renderTickets();
 }
 async function loadUsers() {
-  S.users = await rpc('ae_ops_users', {
-    p_tier: $('#tierSel').value || null,
-    p_q: $('#userQ').value.trim() || null,
-    p_limit: 200, p_offset: 0,
-  });
-  renderUsers();
+  const request = ++S.userRequest;
+  S.userLoading = true;
+  if (S.users) renderUsers();
+  try {
+    const users = await rpc('ae_ops_users', {
+      p_tier: $('#tierSel').value || null,
+      p_q: $('#userQ').value.trim() || null,
+      p_limit: S.userSize, p_offset: S.userPage * S.userSize,
+    });
+    if (request !== S.userRequest) return;
+    const last = Math.max(0, Math.ceil(Number(users.total || 0) / S.userSize) - 1);
+    if (S.userPage > last) { S.userPage = last; return loadUsers(); }
+    S.users = users; S.userLoading = false;
+    renderUsers();
+  } catch (error) {
+    if (request !== S.userRequest) return;
+    S.userLoading = false;
+    $('#userTbl').innerHTML = `<tbody><tr><td class="empty-state">사용자를 불러오지 못했습니다. ${esc(error.message)}</td></tr></tbody>`;
+    $('#userPager').innerHTML = '';
+  }
 }
 async function loadAll() {
+  const epoch = S.sessionEpoch, configRequest = ++S.configRequest;
   const days = Number($('#seriesDays').value || 30);
   const [ov, se, co, cp, cf, rt, au] = await Promise.all([
     rpc('ae_ops_overview'),
@@ -1263,13 +1220,17 @@ async function loadAll() {
     rpc('ae_ops_retention', { p_weeks: 10 }),
     rpc('ae_ops_signup_audit'),
   ]);
+  if (epoch !== S.sessionEpoch) return;
   S.overview = ov; S.series = se; S.content = co; S.couples = cp;
-  S.config = cf; S.retention = rt; S.audit = au;
+  if (configRequest === S.configRequest) S.config = cf;
+  S.retention = rt; S.audit = au;
   S.lastFull = Date.now();
   renderTiers(); renderFunnel(); renderSeries(); renderMoney(); renderAi();
-  renderSystem(); renderContent(); renderCouples(); renderConfig();
+  renderSystem(); renderContent(); renderCouples();
+  if (!$('#configList').contains(document.activeElement)) renderConfig();
   renderRetention(); renderAudit();
   await Promise.all([loadUsers(), loadTickets()]);
+  if (epoch !== S.sessionEpoch) return;
   await loadLive();               // 브리핑은 overview 와 live 가 다 있어야 그린다
 }
 
@@ -1305,34 +1266,60 @@ function renderLiveDetail() {
           : '<span class="pill bad">끊김 — 다시 잇는 중</span>'}</td></tr>
       <tr><td><b>5초마다</b></td><td class="muted">지금 접속 · 오늘 움직인 사람 · 오늘 메시지 · 오늘 가입 · 움직임 목록</td></tr>
       <tr><td><b>60초마다</b></td><td class="muted">사용자 · 커플 · 기능 사용량 · 잔존율 · 돈 · 비서 · 시스템 · 설정 (전부)</td></tr>
-      <tr><td><b>안 옴</b></td><td class="muted">대화 내용 — 운영 계정에는 남의 대화를 읽을 권한이 없습니다(일부러 그렇게 뒀습니다).
-        그래서 메시지 수는 밀어 주는 대신 5초마다 다시 셉니다.</td></tr>
+      <tr><td><b>자동 조회 안 함</b></td><td class="muted">대화 원문은 테스트 메뉴에서 커플을 직접 선택할 때만 조회합니다.
+        메시지 수는 내용 없이 5초마다 다시 집계합니다.</td></tr>
     </tbody></table>
     <div style="margin-top:6px">탭을 뒤로 보내면 전부 멈춥니다. 다시 앞으로 오면 곧바로 한 번 읽습니다.</div>`;
 }
 
+let heartbeat = null;
+function stopHeartbeat() {
+  if (!heartbeat) return;
+  clearInterval(heartbeat.live);
+  clearInterval(heartbeat.paint);
+  document.removeEventListener('visibilitychange', heartbeat.visibility);
+  heartbeat = null;
+}
 function beat() {
+  stopHeartbeat();
+  const epoch = S.sessionEpoch;
+  let running = false;
   const tick = async () => {
-    if (document.hidden || !sess) return;
+    if (document.hidden || !sess || epoch !== S.sessionEpoch || running) return;
+    running = true;
     try {
       await loadLive();
+      if (!sess || epoch !== S.sessionEpoch) return;
       if (Date.now() - S.lastFull > TICK_FULL) await loadAll();
+      if (!sess || epoch !== S.sessionEpoch) return;
       S.failed = 0;
     } catch (e) {
+      if (epoch !== S.sessionEpoch) return;
       S.failed++;
       if (/세션|no session/.test(e.message)) return gate();
-    }
-    paintLive();
+    } finally { running = false; }
+    if (epoch === S.sessionEpoch) paintLive();
   };
-  setInterval(tick, TICK_LIVE);
-  setInterval(paintLive, 1000);
-  document.addEventListener('visibilitychange', () => { paintLive(); if (!document.hidden) tick(); });
+  const visibility = () => { paintLive(); if (!document.hidden) tick(); };
+  heartbeat = { live: setInterval(tick, TICK_LIVE), paint: setInterval(paintLive, 1000), visibility };
+  document.addEventListener('visibilitychange', visibility);
   tick();
   RT.connect();
 }
 
 /* ══ 뼈대 ══════════════════════════════════════════════ */
 function gate() {
+  stopHeartbeat();
+  S.sessionEpoch++; S.ticketRequest++; S.configRequest++;
+  S.ticketDrafts.clear(); S.configDrafts.clear(); S.configExpanded.clear();
+  S.ticketPending.clear(); S.configPending.clear();
+  S.tickets = null; S.config = null; S.users = null;
+  S.ticketId = null; S.userId = null; S.userLoading = false;
+  for (const id of ['#ticketList', '#ticketPane', '#configList', '#userTbl', '#userPager', '#userDetail']) {
+    const el = $(id); if (el) el.innerHTML = '';
+  }
+  clearPrivateRecords();
+  S.userRequest++; S.detailRequest++;
   RT.stop();
   $('#app').hidden = true;
   $('#gate').style.display = 'grid';
@@ -1340,17 +1327,19 @@ function gate() {
 }
 
 async function enter() {
+  const epoch = S.sessionEpoch;
   $('#gate').style.display = 'none';
   $('#app').hidden = false;
   try { await loadAll(); }
   catch (e) {
+    if (epoch !== S.sessionEpoch) return;
     if (/42501|admin only|permission/.test(e.message)) {
       toast('이 계정은 운영자가 아닙니다');
       return gate();
     }
     toast(e.message);
   }
-  beat();
+  if (epoch === S.sessionEpoch) beat();
 }
 
 $('#loginForm').addEventListener('submit', async (ev) => {
@@ -1366,18 +1355,23 @@ $('#loginForm').addEventListener('submit', async (ev) => {
 
 $('#logoutBtn').onclick = () => { gate(); location.reload(); };
 $('#refreshBtn').onclick = async () => {
+  const epoch = S.sessionEpoch;
   $('#refreshBtn').disabled = true;
-  try { await loadAll(); toast('전부 다시 읽었습니다'); }
-  catch (e) { toast(e.message); }
+  try { await loadAll(); if (epoch === S.sessionEpoch) toast('전부 다시 읽었습니다'); }
+  catch (e) { if (epoch === S.sessionEpoch) toast(e.message); }
   finally { $('#refreshBtn').disabled = false; }
 };
 $('#liveChip').onclick = () => {
   const el = $('#liveDetail');
   el.hidden = !el.hidden;
+  $('#liveChip').setAttribute('aria-expanded', String(!el.hidden));
   if (!el.hidden) renderLiveDetail();
 };
 $('#seriesDays').onchange = async () => {
-  S.series = await rpc('ae_ops_series', { p_days: Number($('#seriesDays').value) });
+  const epoch = S.sessionEpoch;
+  const series = await rpc('ae_ops_series', { p_days: Number($('#seriesDays').value) });
+  if (epoch !== S.sessionEpoch) return;
+  S.series = series;
   renderSeries();
 };
 $('#coupleGrp').onchange = renderCouples;
@@ -1385,16 +1379,14 @@ wireLog();
 wireDump();
 $('#hideEmpty').onchange = renderCouples;
 $('#showAllCols').onchange = renderCouples;
-$('#tierSel').onchange = loadUsers;
+$('#tierSel').onchange = () => { S.userPage = 0; loadUsers(); };
+$('#coupleSearch').oninput = renderCouples;
+$('#contentSearch').oninput = renderContent;
+$('#ticketSearch').oninput = renderTickets;
+$('#ticketStatus').onchange = renderTickets;
 
 let qTimer = null;
-$('#userQ').oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(loadUsers, 300); };
-
-$$('#tabs button').forEach((b) => b.onclick = () => {
-  S.tab = b.dataset.tab;
-  $$('#tabs button').forEach((x) => x.classList.toggle('on', x === b));
-  $$('main section').forEach((s) => s.classList.toggle('on', s.id === S.tab));
-});
+$('#userQ').oninput = () => { clearTimeout(qTimer); S.userPage = 0; S.userRequest++; qTimer = setTimeout(loadUsers, 300); };
 
 /* 들어와 있던 세션이 있으면 바로 연다. */
 if (sess?.refresh_token) {

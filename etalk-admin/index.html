@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <title>애톡 운영 콘솔</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>💗</text></svg>">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=20261004-1">
 </head>
 <body>
 
@@ -27,56 +27,54 @@
 
 <!-- ── 본체 ────────────────────────────────────────────── -->
 <div id="app" hidden>
-  <header>
-    <div class="bar">
-      <div class="brand">애톡 <span>운영 콘솔</span></div>
-      <button class="live" id="liveChip" type="button" title="눌러서 자세히">
-        <span class="dot" id="liveDot"></span><span id="liveTxt">잇는 중…</span>
-      </button>
-      <div class="spacer"></div>
-      <button class="btn ghost" id="refreshBtn" type="button">전부 다시 읽기</button>
-      <button class="btn ghost" id="logoutBtn" type="button">나가기</button>
-    </div>
-    <div id="liveDetail" class="livedetail" hidden></div>
-    <nav id="tabs">
-      <button data-tab="sum" class="on">오늘</button>
-      <button data-tab="people">사용자</button>
-      <button data-tab="couples">커플</button>
-      <button data-tab="content">기능 사용량</button>
-      <button data-tab="support">문의<span class="badge" id="openBadge" hidden>0</span></button>
-      <button data-tab="config">설정</button>
-      <button data-tab="test">테스트</button>
-    </nav>
-  </header>
-
-  <main>
+  <a class="skip-link" href="#mainContent">본문으로 이동</a>
+  <aside class="sidebar" aria-label="운영 메뉴">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">a</span><div>애톡 <span>운영 콘솔</span></div></div>
+    <div class="nav-caption">워크스페이스</div>
+    <nav id="tabs" aria-label="주 메뉴"><button type="button" data-tab="sum" class="on" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>오늘 요약</span></button><button type="button" data-tab="people" class="" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M17 5a3 3 0 0 1 0 6m1 4a5 5 0 0 1 3 5"/></svg><span>사용자</span></button><button type="button" data-tab="couples" class="" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg><span>커플</span></button><button type="button" data-tab="content" class="" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m8 10V4m8 16v-7"/></svg><span>기능 사용량</span></button><button type="button" data-tab="support" class="" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H3l1.9-4.6A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8 10h8m-8 4h5"/></svg><span>문의</span><span class="badge" id="openBadge" hidden>0</span></button><button type="button" data-tab="config" class="" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg><span>설정</span></button><button type="button" data-tab="test" class="" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6m-5 0v6L4 19a1.5 1.5 0 0 0 1.3 2h13.4a1.5 1.5 0 0 0 1.3-2L14 9V3M8 14h8"/></svg><span>테스트</span></button></nav>
+    <div class="sidebar-foot"><span class="dot"></span> 애톡 운영 워크스페이스<small>필요한 정보를 한눈에, 정확하게.</small></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar">
+      <div class="topbar-title"><span>애톡 운영</span><strong id="pageTitle">오늘 요약</strong></div>
+      <div class="bar-actions">
+        <button class="live" id="liveChip" type="button" aria-expanded="false" aria-controls="liveDetail" title="데이터 갱신 상태"><span class="dot" id="liveDot"></span><span id="liveTxt">연결 중…</span></button>
+        <button class="btn ghost" id="refreshBtn" type="button">새로고침</button>
+        <button class="btn ghost theme-button" id="themeBtn" type="button" aria-label="어두운 화면으로 전환">화면 테마</button>
+        <button class="btn text-button" id="logoutBtn" type="button">로그아웃</button>
+      </div>
+      <div id="liveDetail" class="livedetail" hidden></div>
+    </header>
+  <main id="mainContent" tabindex="-1">
     <!-- ══ 오늘 ══ -->
     <section id="sum" class="on">
-      <div class="card brief"><div id="brief"></div></div>
+      <div class="section-heading"><div><h1>오늘의 애톡</h1><p>가입부터 활동, 결제와 문의까지 운영 현황을 확인하세요.</p></div><span class="section-caption">ETALK / OPERATIONS</span></div>
+      <div class="grid g4" id="liveTiles"></div>
+      <div class="card brief"><h2>운영 브리핑 <span class="note">지금 확인할 내용</span></h2><div id="brief"></div></div>
 
-      <div class="grid g4" id="liveTiles" style="margin-top:12px"></div>
+
 
       <div class="grid g2" style="margin-top:12px">
         <div class="card">
-          <h2>사용자는 몇 명인가
-            <span class="note">한 가지 답은 늘 틀리다 — 단계로 나눠 센다</span></h2>
+          <h2>사용자 현황
+            <span class="note">가입부터 실제 활동까지 단계별 집계</span></h2>
           <div id="tiers"></div>
         </div>
         <div class="card">
           <h2>가입에서 결제까지
-            <span class="note">어디서 확 꺾이는지를 본다</span></h2>
+            <span class="note">단계별 전환 현황</span></h2>
           <div class="funnel" id="funnel"></div>
         </div>
       </div>
 
       <div class="card" style="margin-top:12px">
-        <h2>가입이 어디서 왔나
+        <h2>가입 경로
           <span class="note">사람으로 셀 수 있는 계정과 아닌 것</span></h2>
         <div id="audit"></div>
       </div>
 
       <div class="card" style="margin-top:12px">
-        <h2>들어온 사람이 남는가 · 잔존율
+        <h2>주간 잔존율
           <span class="note">가입한 주로 묶어, 그 뒤 주마다 몇 명이 다시 움직였나</span></h2>
         <div id="retention"></div>
       </div>
@@ -85,7 +83,7 @@
         <h2>날짜별 추이
           <span class="note" id="seriesNote"></span>
           <span class="spacer"></span>
-          <select id="seriesDays" style="width:auto">
+          <select id="seriesDays" aria-label="날짜별 추이 기간" style="width:auto">
             <option value="14">14일</option>
             <option value="30" selected>30일</option>
             <option value="60">60일</option>
@@ -96,12 +94,12 @@
       </div>
 
       <div class="grid g2" style="margin-top:12px">
-        <div class="card"><h2>돈 <span class="note">하트와 구독</span></h2><div id="money"></div></div>
+        <div class="card"><h2>매출과 하트 <span class="note">결제 · 재화 이용 현황</span></h2><div id="money"></div></div>
         <div class="card"><h2>비서(AI) <span class="note">얼마나 쓰고 얼마나 드나</span></h2><div id="ai"></div></div>
       </div>
 
       <div class="grid g2" style="margin-top:12px">
-        <div class="card"><h2>지금 움직임
+        <div class="card"><h2>최근 활동
           <span class="note">누가 무엇을 했는지만 · 내용은 담지 않는다</span></h2>
           <div class="feed" id="feed"></div></div>
         <div class="card"><h2>시스템 <span class="note">막힌 곳이 있나</span></h2><div id="system"></div></div>
@@ -110,41 +108,44 @@
 
     <!-- ══ 사용자 ══ -->
     <section id="people">
+      <div class="section-heading"><div><h1>사용자</h1><p>사용자를 검색하고 활동 내역과 하트 이용 기록을 확인하세요.</p></div><span class="section-caption">ETALK / OPERATIONS</span></div>
       <p class="lead">계정 하나하나입니다. 줄을 누르면 그 사람이 무엇을 했는지 오른쪽에 펼쳐집니다.</p>
       <div class="card">
         <div class="row2" style="margin-bottom:10px">
-          <select id="tierSel" style="width:auto">
+          <select id="tierSel" aria-label="사용자 활동 단계" style="width:auto">
             <option value="">단계 · 전체</option>
             <option value="active">활동 — 30일 안에 뭔가 함</option>
             <option value="paired">연결만 — 커플은 있는데 조용함</option>
             <option value="visited">둘러봄 — 커플은 없고 흔적만</option>
             <option value="signup">가입만 — 아무 흔적 없음</option>
           </select>
-          <input id="userQ" placeholder="이름 · 이메일 검색" style="max-width:240px">
+          <input id="userQ" aria-label="이름 또는 이메일 검색" placeholder="이름 · 이메일 검색" style="max-width:240px">
           <span class="muted small" id="userCount"></span>
         </div>
-        <div class="split">
-          <div class="tblwrap" style="max-height:70vh;overflow-y:auto">
+        <div class="split people-split">
+          <div class="tblwrap data-scroll" tabindex="0" aria-label="사용자 목록">
             <table id="userTbl"></table>
           </div>
-          <div class="card sub" id="userDetail">
+          <div class="card sub detail-panel" id="userDetail">
             <span class="muted small">왼쪽에서 사람을 고르면 자세히 보여 줍니다.</span>
           </div>
         </div>
+        <div id="userPager" class="pager"></div>
       </div>
     </section>
 
     <!-- ══ 커플 ══ -->
     <section id="couples">
+      <div class="section-heading"><div><h1>커플</h1><p>커플별 최근 활동과 기능 사용량을 비교하세요.</p></div><span class="section-caption">ETALK / OPERATIONS</span></div>
       <p class="lead">방 하나가 한 줄입니다. 열 이름을 누르면 그 기준으로 정렬합니다.</p>
       <div class="card">
         <h2>커플 <span class="note" id="coupleNote"></span></h2>
         <div class="row2" style="margin-bottom:10px">
-          <select id="coupleGrp" style="width:auto"></select>
+          <input id="coupleSearch" type="search" aria-label="커플 이름 검색" placeholder="커플 이름 검색" style="max-width:240px"><select id="coupleGrp" aria-label="커플 기능 분류" style="width:auto"></select>
           <label class="chk"><input type="checkbox" id="hideEmpty"> 아무것도 안 한 커플 숨기기</label>
           <label class="chk"><input type="checkbox" id="showAllCols"> 아무도 안 쓴 기능 열도 보기</label>
         </div>
-        <div class="tblwrap"><table id="coupleTbl"></table></div>
+        <p class="table-hint">열 제목으로 정렬 · 좌우로 스크롤하면 더 많은 기능을 볼 수 있어요</p><div class="tblwrap data-scroll wide-table" tabindex="0" aria-label="커플 이용 현황"><table id="coupleTbl"></table></div>
       </div>
 
       <!-- 한 커플의 행동을 시간순으로. 커플 줄을 누르면 열린다. -->
@@ -154,54 +155,57 @@
           <b>대화 내용은 나오지 않습니다</b> — 무엇을 보냈는지(글·사진·스티커)와
           비서와 셋이서 보낸 것인지만 딱지로 남습니다.</p>
         <div class="row2" style="margin-bottom:10px">
-          <select id="logGrp" style="width:auto"></select>
-          <select id="logSize" style="width:auto">
+          <select id="logGrp" aria-label="행동 기록 분류" style="width:auto"></select>
+          <select id="logSize" aria-label="행동 기록 페이지당 개수" style="width:auto">
             <option value="100">100줄씩</option>
             <option value="200">200줄씩</option>
             <option value="500">500줄씩</option>
           </select>
           <button id="logClose" class="btn ghost">닫기</button>
         </div>
-        <div class="tblwrap"><table id="logTbl"></table></div>
-        <div class="row2" id="logPager" style="margin-top:10px"></div>
+        <div class="pager" id="logPagerTop"></div><div class="tblwrap data-scroll log-scroll" tabindex="0" aria-label="커플 행동 기록"><table id="logTbl"></table></div>
+        <div class="pager" id="logPager"></div>
       </div>
     </section>
 
     <!-- ══ 테스트 ══ -->
     <section id="test">
-      <p class="lead">비서가 무엇을 보고 무엇을 답했는지 눈으로 따라가는 자리입니다.
-        <b>실제 사용자의 사적인 대화</b>이므로 필요할 때만 열어 보세요.</p>
-      <div class="card">
-        <h2>대화 원문 <span class="note" id="dumpNote"></span></h2>
-        <div class="row2" style="margin-bottom:10px">
-          <select id="dumpCouple" style="width:auto"></select>
-          <select id="dumpSize" style="width:auto">
-            <option value="200">200줄씩</option>
-            <option value="500">500줄씩</option>
-            <option value="1000">1000줄씩</option>
-          </select>
-          <button id="dumpCopy" class="btn ghost">이 쪽 복사</button>
+      <div class="section-heading"><div><h1>대화 테스트</h1><p>메시지와 비서 답변을 최신순으로 확인하세요.</p></div><span class="section-caption">ETALK / OPERATIONS</span></div>
+      <div class="notice-line"><span class="pill">관리자 전용</span> 선택한 커플의 대화 원문입니다. 필요한 대화만 열어 확인하세요.</div>
+      <div class="card message-workspace">
+        <div class="message-toolbar">
+          <div class="toolbar-title"><h2>메시지 기록 <span class="note" id="dumpNote"></span></h2><span class="sort-label">최신 메시지부터</span></div>
+          <div class="row2">
+            <label class="field grow">커플<select id="dumpCouple"><option value="">커플을 선택하세요</option></select></label>
+            <label class="field page-size">페이지당<select id="dumpSize"><option value="50">50개</option><option value="100">100개</option><option value="200">200개</option><option value="500">500개</option></select></label>
+            <button id="dumpRefresh" class="btn ghost" type="button">최신 다시 읽기</button>
+            <button id="dumpCopy" class="btn ghost" type="button" disabled>이 페이지 복사</button>
+          </div>
+          <div class="message-filter"><label class="sr-only" for="dumpSearch">현재 페이지 메시지 검색</label><input type="search" id="dumpSearch" placeholder="현재 페이지에서 이름 · 메시지 검색"><span id="dumpStatus" class="muted small" role="status">커플을 선택해 주세요.</span></div>
         </div>
-        <div class="tblwrap"><table id="dumpTbl"></table></div>
-        <div class="row2" id="dumpPager" style="margin-top:10px"></div>
+        <div class="pager pager-top" id="dumpPagerTop"></div>
+        <div id="dumpMessages" class="message-list" tabindex="0" aria-label="메시지 목록"><div class="empty-state"><strong>확인할 커플을 선택해 주세요</strong><p>가장 최근 대화가 1페이지에 표시됩니다.</p></div></div>
+        <div class="pager" id="dumpPager"></div>
       </div>
     </section>
 
     <!-- ══ 기능 사용량 ══ -->
     <section id="content">
+      <div class="section-heading"><div><h1>기능 사용량</h1><p>자주 쓰이는 기능과 기간별 이용 추이를 확인하세요.</p></div><span class="section-caption">ETALK / OPERATIONS</span></div>
       <p class="lead">어떤 기능이 실제로 쓰이는가. 막대는 30일 기준이고 가장 많이 쓰인 기능이 꽉 찬 길이입니다.
         새 기능을 만들면 <span class="mono">ae_ops_sources</span> 표에 한 줄만 넣으면 여기 저절로 나옵니다.</p>
       <div class="card">
-        <div class="tblwrap"><table id="contentTbl"></table></div>
+        <div class="row2" style="margin-bottom:16px"><input id="contentSearch" type="search" aria-label="기능 이름 검색" placeholder="기능 이름 · 갈래 검색" style="max-width:320px"></div><div class="tblwrap data-scroll" tabindex="0" aria-label="기능 사용량"><table id="contentTbl"></table></div>
       </div>
     </section>
 
     <!-- ══ 문의 ══ -->
     <section id="support">
+      <div class="section-heading"><div><h1>문의함</h1><p>문의와 답변을 한곳에서 확인하고 관리하세요.</p></div><span class="section-caption">ETALK / OPERATIONS</span></div>
       <p class="lead">답장을 보내면 사용자 앱에 <b>즉시</b> 뜹니다. 새 문의도 실시간으로 들어옵니다.</p>
-      <div class="split">
-        <div class="card" style="padding:0">
-          <div class="list" id="ticketList"></div>
+      <div class="row2" style="margin-bottom:16px"><input id="ticketSearch" type="search" aria-label="문의 검색" placeholder="제목 · 사용자 검색" style="max-width:300px"><select id="ticketStatus" aria-label="문의 상태" style="width:auto"><option value="">모든 상태</option><option value="open">답변 대기</option><option value="answered">답변 완료</option><option value="closed">종료</option></select></div><div class="split support-split">
+        <div class="card ticket-list-card">
+          <div class="list" id="ticketList" aria-label="문의 목록"></div>
         </div>
         <div class="card" id="ticketPane">
           <span class="muted small">왼쪽에서 문의를 고르세요.</span>
@@ -211,18 +215,22 @@
 
     <!-- ══ 설정 ══ -->
     <section id="config">
+      <div class="section-heading"><div><h1>운영 설정</h1><p>설정값을 확인하고 필요한 항목만 수정하세요.</p></div><span class="section-caption">ETALK / OPERATIONS</span></div>
       <p class="lead">여기서 고치는 것은 전부 Supabase 의 <span class="mono">ae_config</span> 표입니다.
         저장하면 <b>앱을 다시 내지 않고</b> 반영됩니다 — 앱은 켤 때와 앞으로 되돌아올 때 이 표를 다시 읽습니다.
         각 값이 무엇을 바꾸고 누가 읽는지 아래에 적어 두었습니다.</p>
-      <div id="configList"></div>
+      <div class="config-toolbar"><label class="sr-only" for="configSearch">설정 검색</label><input type="search" id="configSearch" placeholder="설정 이름이나 설명으로 검색"><span class="small muted" id="configResult"></span></div><div id="configList"></div><div id="configEmpty" class="empty-state" hidden>검색 조건에 맞는 설정이 없습니다.</div>
       <div class="card" style="margin-top:14px">
         <h2>여기서는 못 바꾸는 것 <span class="note">왜 못 바꾸는지도 함께</span></h2>
         <div id="cantChange"></div>
       </div>
     </section>
   </main>
+  </div>
 </div>
 
-<script src="app.js?v=5"></script>
+<script src="messages.js?v=20261004-1"></script>
+<script src="app.js?v=20261004-1"></script>
+<script src="ui.js?v=20261004-1"></script>
 </body>
 </html>
