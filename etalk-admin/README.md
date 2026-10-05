@@ -19,15 +19,42 @@
 
 ## 파일
 
-- `index.html` — 일곱 메뉴, 사이드바, 카드와 검색·쪽 이동 영역의 뼈대.
+- `index.html` — 여덟 메뉴, 사이드바, 카드와 검색·쪽 이동 영역의 뼈대.
 - `app.js` — 인증, 실시간 연결, 집계 조회와 화면 렌더링, 문의 답장과 설정 저장.
   문의·설정 초안과 저장 중 상태를 보존한다. 집계 숫자는 서버에서 받은 값을 쓴다.
 - `messages.js` — 커플 행동 기록과 테스트 대화 조회, 최신순 쪽 이동, 현재 쪽 검색과 복사.
   선택을 바꾸거나 로그아웃한 뒤 도착한 이전 요청의 응답은 무시한다.
+- `payments.js` — 결제 검색·환경·스토어·기간 필터, 최신순 페이지와 구매 상세.
+  실제 결제만 기본 조회하며, 고객 결제나 하트 원장을 수정하는 기능은 없다.
 - `ui.js` — 메뉴별 스크롤 위치, 밝은/어두운 화면 전환, 설정 검색.
 - `style.css` — 밝은 화면을 기본으로 하는 반응형 레이아웃과 어두운 화면 스타일.
 
-스크립트는 `messages.js` → `app.js` → `ui.js` 순서로 읽는다. 빌드 단계는 없다.
+스크립트는 `messages.js` → `payments.js` → `app.js` → `ui.js` 순서로 읽는다. 빌드 단계는 없다.
+
+## 결제 내역과 배포 순서
+
+결제 메뉴 배포 전 `supabase/migrations/0288_ops_payments.sql`을 DB에 적용한다.
+`ae_ops_payments`는 관리자만 읽을 수 있는 RPC이며 영수증 원문·구매 토큰은 반환하지 않는다.
+조회는 `created_at DESC, id DESC` 순서이고 1페이지가 최신이다. 기본 25건씩 표시한다.
+
+- 구매자 이름·이메일·현재 잔액, 원장에 기록된 커플, 현재 연결된 커플을 조회한다.
+- 커플 ID는 구매 원장 기준이지만, 이름과 멤버 구성은 현재 값이다.
+- 지급 시각은 하트 원장의 시각이다. 스토어에서 청구한 시각과 같다고 보장하지 않는다.
+- `heart_prices`는 현재 KRW 참고 가격이다. 실제 결제 금액·통화·정산액은 저장되어 있지
+  않으므로 추정 금액으로만 표시하고, 설정이 없으면 금액 미확인으로 표시한다.
+- 스토어의 사후 현금 환불 상태는 연동되어 있지 않다. 하트 지급 완료가 환불 없음이나
+  현재 보유 하트를 뜻하지 않는다. 실패·보류 중으로 지급되지 않은 결제도 원장에 없다.
+
+배포 검증은 아래 도구로 한다. 기본 모드는 실제 스키마에서 검증 후 롤백하며, `--apply`만
+관리자 조회 함수를 반영한다. 결제 엔진과 기존 구매 원장이 바뀌지 않았는지도 검사한다.
+
+```sh
+python3 tool/apply_ops_payments.py --token-file /path/to/existing-supabase-token
+python3 tool/apply_ops_payments.py --token-file /path/to/existing-supabase-token --apply
+```
+
+DB 적용 후 정적 콘솔을 기존 `tool/deploy_console.sh`로 배포한다.
+롤백은 이전 정적 파일 배포로 가능하며, 새 읽기 함수는 기존 앱에서 사용하지 않는다.
 
 ## 대화 조회와 배포 순서
 
@@ -77,6 +104,7 @@ node tool/console_preview.mjs
 ```sh
 node --test tool/tests/console_messages.test.cjs
 node --test tool/tests/console_drafts.test.cjs
+node --test tool/tests/console_payments.test.cjs
 ```
 
 첫 테스트는 최신순 페이지·snapshot·빈 결과·오류·늦은 응답·문자열 표시를,

@@ -16,6 +16,7 @@
     document.querySelector('#pageTitle').textContent = button.querySelector('span').textContent;
     document.title = `${button.querySelector('span').textContent} · 애톡 운영 콘솔`;
     window.scrollTo({ top: savedScroll.get(S.tab) || 0, behavior: 'instant' });
+    if (S.tab === 'payments') openPayments();
   }
   buttons.forEach((button) => { button.onclick = () => activate(button); });
 
@@ -52,6 +53,10 @@
     document.querySelector('#configEmpty').hidden = visible > 0 || total === 0;
   }
   document.querySelector('#configSearch').oninput = refreshConfig;
+  document.querySelector('#paymentShortcut').onclick = () => {
+    const button = buttons.find((item) => item.dataset.tab === 'payments');
+    if (button) activate(button);
+  };
   window.AeConsoleUI = { refreshConfig };
   refreshConfig();
 })();
