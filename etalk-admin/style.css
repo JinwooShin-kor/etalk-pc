@@ -230,3 +230,21 @@ table.doc td { text-align:left; white-space:normal; vertical-align:top; padding:
 @media(max-width:1350px) { .payment-split { grid-template-columns:minmax(0,1.5fr) minmax(290px,1fr); }.payment-metric { padding:15px; }.payment-metric>strong { font-size:23px; } }
 @media(max-width:1100px) { .payment-split { grid-template-columns:1fr; }.payment-detail { max-height:none; }.payment-detail .empty-state { min-height:120px; }.payment-facts>div { grid-template-columns:150px minmax(0,1fr); gap:15px; }.payment-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }.payment-scroll { max-height:600px; } }
 @media(max-width:700px) { .payment-notice { flex-direction:column; gap:8px; padding:13px; font-size:11px; }.payment-summary { gap:10px; margin-bottom:16px; }.payment-metric { padding:13px; }.payment-metric>strong { font-size:22px; }.payment-metric>small { font-size:10px; }.payment-workspace { padding:14px; }.payment-search { flex-basis:100%; min-width:0; }.payment-filters .field:not(.payment-search) { flex:1; min-width:100px; }.payment-filters .btn { padding:8px 11px; font-size:12px; }.payment-detail { padding:16px; scroll-margin-top:75px; }.payment-facts>div { grid-template-columns:1fr; gap:3px; }.payment-list-heading h2 { font-size:13px; }#paymentTbl td { padding:12px 10px; } }
+
+/* 홈 공지: 출시 일정 연결 도구. 실제 저장 전에는 JSON 초안만 편집한다. */
+.announcement-guide { margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel2); }
+.announcement-guide p { font-size: 12px; color: var(--ink2); line-height: 1.65; margin: 5px 0 0; }
+.announcement-edit-row { margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.announcement-edit-row > label { display: block; margin-bottom: 8px; font-weight: 600; }
+.announcement-edit-row > label > span { margin-left: 6px; font-weight: 400; }
+.announcement-valid { color: var(--good); font-size: 12px; line-height: 1.6; }
+.announcement-note { color: var(--warn); font-size: 12px; line-height: 1.6; }
+.announcement-preview { position: relative; margin-top: 12px; padding: 20px 16px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel2); overflow-wrap: anywhere; }
+.announcement-preview:has(.announcement-seal) { padding-top: 40px; }
+.announcement-preview > strong { display: block; }
+.announcement-preview > p { white-space: pre-wrap; color: var(--ink2); margin: 5px 0 12px; }
+.announcement-preview-action { font-size: 12px; color: var(--pink); }
+.announcement-seal { position: absolute; top: 7px; left: 12px; display: grid; place-items: center; width: 43px; height: 31px; color: #8d421c; background: linear-gradient(135deg,#fff3b8,#f5b847 27%,#ffeaa0 50%,#d99d39 78%,#ffe7a0); font-size: 10px; font-style: italic; font-weight: 800; transform: rotate(-12deg); clip-path: polygon(50% 0,60% 13%,74% 3%,78% 20%,95% 18%,91% 36%,100% 50%,88% 60%,95% 79%,77% 80%,72% 97%,58% 87%,47% 100%,38% 85%,22% 96%,20% 78%,3% 80%,10% 62%,0 49%,12% 38%,6% 20%,24% 20%,28% 3%,41% 13%); }
+:root:not([data-theme="dark"]) .announcement-valid { color: #167249; }
+:root:not([data-theme="dark"]) .announcement-preview-action { color: #b62f5b; }
+:root:not([data-theme="dark"]) .announcement-note { color: #8a5700; }

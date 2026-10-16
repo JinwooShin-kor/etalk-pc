@@ -27,9 +27,10 @@
 - `payments.js` — 결제 검색·환경·스토어·기간 필터, 최신순 페이지와 구매 상세.
   실제 결제만 기본 조회하며, 고객 결제나 하트 원장을 수정하는 기능은 없다.
 - `ui.js` — 메뉴별 스크롤 위치, 밝은/어두운 화면 전환, 설정 검색.
+- `announcement_editor.js` — 홈 공지의 콘텐츠 연결, 검증, 문구·이동 미리보기.
 - `style.css` — 밝은 화면을 기본으로 하는 반응형 레이아웃과 어두운 화면 스타일.
 
-스크립트는 `messages.js` → `payments.js` → `app.js` → `ui.js` 순서로 읽는다. 빌드 단계는 없다.
+스크립트는 `messages.js` → `payments.js` → `announcement_editor.js` → `app.js` → `ui.js` 순서로 읽는다. 빌드 단계는 없다.
 
 ## 결제 내역과 배포 순서
 
@@ -109,3 +110,51 @@ node --test tool/tests/console_payments.test.cjs
 
 첫 테스트는 최신순 페이지·snapshot·빈 결과·오류·늦은 응답·문자열 표시를,
 두 번째는 문의·설정의 초안과 저장 중 상태, 로그아웃 뒤 응답 무효화를 확인한다.
+
+## 홈 공지와 콘텐츠 출시 일정 연결 (앱 빌드 304 이상)
+
+설정 → `home_announcements`에서 각 공지의 연결 콘텐츠를 선택합니다.
+선택하면 `content_release_key`와 이동 `action`/`target`이 함께 맞춰집니다.
+제목, 본문, 이미지, ID, 정렬, 추가 노출 기간 등 다른 필드는 유지합니다.
+선택이나 미리보기는 JSON 초안만 바꾸며 **저장 버튼을 눌러야 서버에 반영**됩니다.
+공지 배열이 없으면 빈 편집기가 표시되고, 기존 JSON 방식으로 공지를 추가할 수 있습니다.
+
+- 연결 공지는 `min_build >= 304`가 필수입니다. 선택 시 최소 304로 올리고 더 큰 기존 값은 유지합니다. 구버전 앱이 출시 일정 조건을 무시하고 배너를 노출하는 일을 막습니다.
+- 실제 노출은 콘텐츠 출시 일정의 활성 상태·메뉴 노출 여부와 공지 자체의 기간·최소 빌드 조건을 모두 만족할 때입니다. 일정의 기간/끄기/재노출은 앱의 운영자 화면 **신규 콘텐츠 노출**에서 관리합니다.
+- 소원 쿠폰과 우리 집은 현재 숨긴 콘텐츠입니다. 연결해도 앱에서 표시되지 않으며, 연결 설정은 기능 숨김을 해제하지 않습니다.
+- 연결 해제 시 일반 콘텐츠는 기존 이동 화면을 유지합니다. 숨긴 소원 쿠폰/우리 집은 `detail` / 빈 `target`으로 돌아갑니다.
+- 미리보기는 문구·연결·이동 화면 확인용입니다. 실제 캠페인 활성 상태나 이미지 배너의 앱 화면 배치를 재현하지 않습니다.
+- 자동 새로고침은 작성 중인 공지 초안을 보존합니다. 저장 직전 서버 값이 달라졌다면 덮어쓰기를 차단합니다. 객체 키 순서 차이는 변경으로 보지 않으며 배열 순서는 유지합니다.
+
+| 콘텐츠 키 | 이동 종류 | 이동 대상 |
+|---|---|---|
+| letter | route | /games/letters |
+| coupon | route | /games/coupons |
+| games | route | /games/list |
+| spin | route | /games/spin |
+| match | feature | match |
+| tarot | feature | tarot |
+| court | route | /games/court |
+| course | route | /games/course |
+| trip | route | /games/trip |
+| house | feature | house |
+| gift | feature | gift |
+| child | route | /games/child |
+| report | route | /report |
+
+`announcement_editor.js`에는 서버 호출이 없습니다. 저장은 기존 관리자 전용
+`ae_ops_set_config` 권한을 그대로 사용합니다. 공백·알 수 없는 콘텐츠 키,
+잘못된 이동 대상, 기간, 중복 ID, 연결 공지의 낮은 최소 빌드는 저장 전에 차단합니다.
+
+검증은 저장소 루트에서 실행합니다.
+
+```sh
+node --check console/app.js
+node --check console/announcement_editor.js
+node --test console/tests/*.test.cjs
+python3 -m http.server 8764 --bind 127.0.0.1 --directory console
+```
+
+로컬 브라우저의 `/tests/announcement_editor_fixture.html`은 합성 공지만 사용하는
+화면 검증용입니다. 로그인·운영 데이터 조회·서버 저장 기능이 없습니다.
+`tests/`의 모든 데이터는 합성이며 사용자 정보나 비밀 값을 포함하지 않습니다.

@@ -1002,7 +1002,7 @@ function renderTicket() {
    확인한 것이다(lib/app/remote_config.dart · supabase/functions · DB 함수). */
 const CFG_GROUPS = [
   ['앱 업데이트 벽', ['min_build', 'update_message', 'update_url_ios', 'update_url_android']],
-  ['앱에 보이는 것', ['notice', 'welcome_message', 'checkin_anim_ms', 'map_style']],
+  ['앱에 보이는 것', ['notice', 'home_announcements', 'welcome_message', 'checkin_anim_ms', 'map_style']],
   ['기능 스위치와 한도', ['flags', 'limits', 'free_trial_days']],
   ['하트 값', ['attend_hearts', 'score_reset_hearts', 'house_grow_base']],
   ['컨텐츠 기본값', ['spin_presets']],
@@ -1023,6 +1023,11 @@ const CFG_DOC = {
     what: '홈 위쪽에 뜨는 공지 한 장. <span class="mono">{"id":"...","text":"...","url":""}</span> 꼴이고, ' +
           '<b>id 를 바꿔야 새 공지</b>로 칩니다(닫은 공지는 id 로 기억합니다). null 이면 공지 없음.',
     who: '앱',
+  },
+  home_announcements: {
+    what: '홈 공지 배너 배열입니다. 아래 연결 도구로 콘텐츠 출시 일정과 연동할 수 있습니다. ' +
+      '문구·이미지·정렬·추가 기간은 JSON에서 편집합니다. 비우려면 []을 입력하세요.',
+    who: '홈 공지 배너 · 콘텐츠 NEW 일정 (연결 공지는 빌드 304 이상)',
   },
   welcome_message: { what: '커플이 처음 이어졌을 때 비서 「애비」가 방에 남기는 첫인사.', who: 'DB 함수 ae_welcome_text' },
   checkin_anim_ms: { what: '「오늘 하루」 편지가 접혀 날아가기까지 걸리는 시간(밀리초). 600~8000 밖은 앱이 알아서 가둡니다.', who: '앱' },
@@ -1060,11 +1065,20 @@ const CANT_CHANGE = [
    '지금은 SQL 로만 넣습니다. 원하시면 이 화면에 붙여 드리겠습니다.'],
 ];
 
+let announcementBase = null;
+let announcementMount = null;
+function rememberAnnouncementBase(serverValue) {
+  announcementBase = S.configDrafts.has('home_announcements')
+    ? announcementBase ?? AeAnnouncementEditor.fingerprint(serverValue ?? []) : null;
+}
+
 function renderConfig() {
-  const c = S.config; if (!c) return;
+  if (!S.config) return;
+  const c = { home_announcements: { value: [], updated_at: null }, ...S.config };
   const activeEditor = $('#configList').contains(document.activeElement)
     && document.activeElement.matches('textarea[data-k]') ? document.activeElement : null;
   if (activeEditor?.dataset.composing === 'true') return;
+  announcementMount?.dispose();
   const editorKey = activeEditor?.dataset.k;
   const editorState = captureEditorState(activeEditor);
   const listScroll = $('#configList').scrollTop;
@@ -1077,7 +1091,7 @@ function renderConfig() {
       const doc = CFG_DOC[k] || {};
       const serverJson = JSON.stringify(c[k].value, null, 2);
       const json = S.configDrafts.get(k) ?? serverJson;
-      const big = serverJson.length > 300;
+      const big = k !== 'home_announcements' && serverJson.length > 300;
       const closed = big && !S.configExpanded.has(k) && !S.configDrafts.has(k);
       return `<div class="cfgrow ${closed ? 'closed' : ''}" data-config-key="${esc(k)}">
         <div class="head"><b class="mono">${esc(k)}</b>
@@ -1089,9 +1103,11 @@ function renderConfig() {
         <div class="who">읽는 곳: ${esc(doc.who || '?')}</div>
         ${doc.danger ? `<div class="danger">⚠ ${doc.danger}</div>` : ''}
         <div class="body">
+          ${k === 'home_announcements' ? '<div id="announcementEditor"></div>' : ''}
           <textarea class="mono" data-k="${esc(k)}" style="margin-top:8px">${esc(json)}</textarea>
           <div class="row2" style="margin-top:6px">
             <button class="btn ghost" data-save="${esc(k)}" type="button"${S.configPending.has(k) ? ' disabled' : ''}>저장</button>
+            ${k === 'home_announcements' ? '<button class="btn ghost" id="announcementDiscard" type="button">작성 취소 · 최근 서버 값 보기</button>' : ''}
             <span class="err small" data-err="${esc(k)}"></span>
           </div>
         </div>
@@ -1113,13 +1129,28 @@ function renderConfig() {
     ta.oncompositionend = () => { ta.dataset.composing = 'false'; };
     ta.oninput = () => {
       const key = ta.dataset.k;
-      if (!S.configPending.has(key) && ta.value === JSON.stringify(S.config[key].value, null, 2)) S.configDrafts.delete(key);
+      if (!S.configPending.has(key) && ta.value === JSON.stringify(c[key].value, null, 2)) S.configDrafts.delete(key);
       else S.configDrafts.set(key, ta.value);
+      if (key === 'home_announcements') {
+        rememberAnnouncementBase(c.home_announcements.value);
+        announcementMount?.render();
+      }
       const row = ta.closest('.cfgrow'), existing = row.querySelector('.dirty-label');
       if (S.configDrafts.has(key) && !existing) { const label = document.createElement('span'); label.className = 'dirty-label'; label.textContent = '저장하지 않은 변경'; row.querySelector('.head').appendChild(label); }
       if (!S.configDrafts.has(key)) existing?.remove();
     };
   });
+  const announcementJson = $('#configList textarea[data-k="home_announcements"]');
+  announcementMount = AeAnnouncementEditor.mount($('#announcementEditor'), announcementJson,
+    () => announcementJson.oninput());
+  $('#announcementDiscard').onclick = () => {
+    S.configDrafts.delete('home_announcements');
+    announcementBase = null;
+    renderConfig();
+  };
+  if (announcementBase !== null && announcementBase !== AeAnnouncementEditor.fingerprint(c.home_announcements.value)) {
+    $('#configList [data-err="home_announcements"]').textContent = '작성 중 서버 값이 바뀌었습니다. 저장을 차단했습니다. 작성 내용을 복사한 뒤 최근 서버 값을 확인하세요.';
+  }
   window.AeConsoleUI?.refreshConfig();
   if (editorKey) restoreEditorState($(`#configList textarea[data-k="${CSS.escape(editorKey)}"]`), editorState);
   $('#configList').scrollTop = listScroll;
@@ -1134,6 +1165,13 @@ function renderConfig() {
     let v;
     try { v = JSON.parse(submittedText); }
     catch { err.textContent = 'JSON 형식이 아닙니다 — 따옴표와 쉼표를 확인하세요'; return; }
+    if (k === 'home_announcements') {
+      const errors = AeAnnouncementEditor.validate(v);
+      if (errors.length) { err.textContent = errors.join(' / '); return; }
+      S.configDrafts.set(k, submittedText);
+      rememberAnnouncementBase(c.home_announcements.value);
+    }
+    const submittedAnnouncementBase = k === 'home_announcements' ? announcementBase : null;
     // 되돌리기 어려운 것 하나만 다시 묻는다.
     if (k === 'min_build' && Number(v) > 0 &&
         !confirm(`최소 빌드를 ${v} 로 올립니다.\n이보다 낮은 빌드를 쓰는 사람은 앱이 막힙니다. 계속할까요?`)) return;
@@ -1141,9 +1179,20 @@ function renderConfig() {
     S.configPending.add(k); S.configRequest++;
     b.disabled = true;
     try {
+      if (k === 'home_announcements') {
+        const latest = await rpc('ae_ops_config');
+        if (epoch !== S.sessionEpoch) return;
+        if (submittedAnnouncementBase !== AeAnnouncementEditor.fingerprint(latest.home_announcements?.value ?? [])) {
+          S.config = latest;
+          throw new Error('서버 공지가 다른 곳에서 변경되었습니다. 작성 내용을 복사한 뒤 최근 서버 값을 확인하고 다시 편집하세요.');
+        }
+      }
       await rpc('ae_ops_set_config', { p_key: k, p_value: v });
       if (epoch !== S.sessionEpoch) return;
       if (S.configDrafts.get(k) === submittedText) S.configDrafts.delete(k);
+      if (k === 'home_announcements') {
+        announcementBase = S.configDrafts.has(k) ? AeAnnouncementEditor.fingerprint(v) : null;
+      }
       toast(`${k} 저장했습니다`);
       const request = ++S.configRequest;
       const config = await rpc('ae_ops_config');
@@ -1310,6 +1359,8 @@ function beat() {
 function gate() {
   stopHeartbeat();
   S.sessionEpoch++; S.ticketRequest++; S.configRequest++;
+  announcementBase = null;
+  announcementMount?.dispose(); announcementMount = null;
   S.ticketDrafts.clear(); S.configDrafts.clear(); S.configExpanded.clear();
   S.ticketPending.clear(); S.configPending.clear();
   S.tickets = null; S.config = null; S.users = null;
